@@ -1,0 +1,8 @@
+<div class="figure">
+  <div class="figure-content">
+    <img src="$img_path" alt="$img_alt"></img>
+  </div>
+  <div class="figure-caption">
+    <span class="caption-label">$caption_label</span><span class="caption-text">$caption_text</span>
+  </div>
+</div>
