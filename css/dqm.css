@@ -1,0 +1,117 @@
+:root{
+    --color-1: #10394D;
+    --color-2: #6CB4D5;
+    --color-3: #2B98CC;
+    --color-4: #444F54;
+    --color-4-a: rgba(68, 79, 84, 0.2);
+    --color-5: #207399;
+    color: white;
+    background-color: var(--color-4);
+    color: #dddddd;
+    margin: 0 0 0 0;
+}
+
+* {
+    box-sizing: border-box;
+    
+}
+
+body{
+    margin: 0 0 0 0;
+}
+
+.header{
+    top: 0;
+    text-align: center;
+    background-color: var(--color-1);
+    color: white;
+    width: 100%;
+    padding: 10px;
+}
+
+.topnav{
+    overflow: hidden;
+    background-color: var(--color-5);
+    color: white;
+    margin: 0 0 0 0;
+}
+
+.topnav a {
+    float: left;
+    color: white;
+    display: block;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+/* Change color on hover */
+.topnav a:hover {
+  background-color: var(--color-2);
+}
+
+.footer{
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    font-size: small;
+    text-align: right;
+    background-image: linear-gradient(to bottom, var(--color-4-a), var(--color-4)); 
+}
+
+.content{
+    min-height: 400px;
+}
+
+.flexcontent {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 4px;
+}
+
+.runlist {
+    max-width: 600px;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 4px;
+    margin: auto;
+}
+
+.figure {
+    max-width: 680px;
+    padding: 2% 2% 2% 2%;
+}
+
+.figure img {
+    width: 100%;
+}
+
+.figure-content{
+}
+
+.figure-caption{
+    max-width: 100%;
+    text-justify:inter-word;
+    padding: 0 3% 0 3%;
+}
+
+.caption-label{
+    font-weight: bold;
+    margin-right: 0.5em;
+}
+
+.caption-text{
+}
+
+.run_number{
+    min-width: 4em;
+    padding: 4px;
+    text-align: right;
+}
+
+.run_number > a {
+    color: white;
+    text-align: right;
+}
