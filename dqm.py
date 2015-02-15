@@ -20,7 +20,7 @@ import urlparse
 
 verb = 99
 
-root_dir = "/home/dqm/dqm/v0"
+root_dir = "/home/dqm/dqm/xdqm-devel"
 plot_dir_live = "store/live"
 plot_dir_runs = "store/runs"
 
@@ -181,9 +181,20 @@ def get_run_list():
     r = []
 
     for p in glob.iglob(os.path.join(plot_dir_runs, "*")):
-        if not re.match(r'.*/\d+$', p) or not os.path.isdir(p):
+        #if not re.match(r'.*/\d+$', p) or not os.path.isdir(p): # FIXME: this is the original version
+        #    continue
+        #r.append(os.path.basename(p))
+        if not re.match(r'.*/\d+$', p) and not os.path.isdir(p):
             continue
         r.append(os.path.basename(p))
+
+        #if re.match(r'.*/\d+$', p):
+        #    r.append([os.path.basename(p), 'r'])
+        #elif os.path.isdir(p):
+        #    r.append([os.path.basename(p), 'd'])
+        #else:
+        #    continue
+
     if(len(r) == 0):
         msg(1, "No run found!")
     r = natural_sort(r)
@@ -194,8 +205,14 @@ def get_run_list():
 def gen_runs(environ):
     run_list = ""
     for r in get_run_list():
-        run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
-        
+        #FIXME: original from Philippe
+        #run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
+        path = environ.get('PATH_INFO')
+        if os.path.isdir(path + '/' + r):
+            runlist += build_page("templates/run.thtml", {"link": path + '/' + r , "run_num": r})
+        else:
+            run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
+
     return "text/html", build_page("templates/main.thtml", {"content": run_list, "content_class": "runlist"})
 
 store.register("/runs", gen_runs)
