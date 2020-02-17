@@ -90,12 +90,13 @@ def find_peaks(stream, weights, window=200, threshold=20., rise=10):
     peaks, peaks_max = [], []
     wM = np.argmax(weights)
     wL = len(weights)
-    i = 0
+    i = wL
     sL =  len(stream) - window
     while i < sL:
         if stream[i + rise] - stream[i] > threshold:
             m = np.argmax(stream[i:i + window])
             ampl = np.dot(stream[i + m - wM:i + m - wM + wL], weights)
+            print('# max found:', i, m, ampl)
             peaks.append(i + m)
             peaks_max.append(ampl)
             i = i + window
@@ -160,14 +161,14 @@ def gp_set_defaults():
 
 
 def plot_amplitude(maxima, suffix):
-    values, edges = np.histogram(maxima, bins=1000, range=(0, 10000), density=False)
+    values, edges = np.histogram(maxima, bins=1500, range=(0, 15000), density=False)
     gp_set_defaults()
     gp.c('set out odir."amplitude%s"' % suffix)
     gp.c('set log y')
     gp.c('set ylabel "Events / 10 ADC count"')
     gp.c('set xlabel "Amplitude (ADC count)"')
-    gp.s([edges[:-1], values])
-    gp.c('plot [][0.1:] "tmp.dat" u 1:2 not w histep lt 6')
+    gp.s([edges[:-1], values], filename='tmp_amplitude.dat')
+    gp.c('plot [][0.1:] "tmp_amplitude.dat" u 1:2 not w histep lt 6')
     gp.c('set out')
 
 
@@ -175,13 +176,13 @@ def plot_amplitude(maxima, suffix):
 def plot_peaks(peaks, peaks_max, suffix):
     gp_set_defaults()
     gp.c('set out odir."peaks%s"' % suffix)
-    gp.s([peaks, peaks_max])
+    gp.s([peaks, peaks_max], filename='tmp_peaks.dat')
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set ylabel "Amplitude (ADC count)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "tmp.dat" u (hour($1)):($2) not w l lt 6')
+    gp.c('plot [][] "tmp_peaks.dat" u (hour($1)):($2) not w l lt 6')
     gp.c('set out')
 
 
@@ -189,20 +190,20 @@ def plot_peaks(peaks, peaks_max, suffix):
 def plot_baseline(base, base_min, suffix):
     gp_set_defaults()
     gp.c('set out odir."baseline%s"' % suffix)
-    gp.s([base, base_min])
+    gp.s([base, base_min], filename='tmp_baseline.dat')
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set ylabel "Amplitude (ADC count)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "tmp.dat" u (hour($1)):($2) not w l lt 6')
+    gp.c('plot [][] "tmp_baseline.dat" u (hour($1)):($2) not w l lt 6')
     gp.c('set out')
 
 
 
 def plot_pulse_shapes(shapes, suffix):
 
-    of = open('tmp.dat', 'w')
+    of = open('tmp_shapes.dat', 'w')
     for cnt, el in enumerate(shapes):
         for i, v in enumerate(el[0]):
             of.write("%d %f %d %f\n" % (i, v, cnt, el[1]))
@@ -220,7 +221,7 @@ def plot_pulse_shapes(shapes, suffix):
     gp.c('set out odir."/shapes%s"' % suffix)
     #gp.c('set log y')
     gp.c('unset colorbox')
-    gp.c('plot [][1:] "tmp.dat" u 1:2:3 not w l lt palette')
+    gp.c('plot [][1:] "tmp_shapes.dat" u 1:2:3 not w l lt palette')
     gp.c('set out')
 
 
@@ -275,8 +276,9 @@ def plot_fft_data(freq, power, suffix):
 cfg = parse_config('configuration.cfg')
 
 data = []
-data.append(read_data("/home/ferri/data/double_beta/canfranc/20190615_21h27.BIN2"))
-data.append(read_data("/home/ferri/data/double_beta/canfranc/20190615_21h27.BIN3"))
+#data.append(read_data("/home/ferri/data/double_beta/canfranc/20190615_21h27.BIN2"))
+#data.append(read_data("/home/ferri/data/double_beta/canfranc/20190615_21h27.BIN3"))
+data.append(read_data_new_daq("/home/ferri/tmp/downloads/000001_20191222T054757_001_001.bin"))
 
 #data.append(read_data_new_daq('/home/ferri/data/double_beta/canfranc/new_daq/CH1_20191211T115653_0.bin'))
 #for el, flags in zip(np.array((np.array(data[0]) >> 8) - 0x800000, dtype=np.int32), np.array(data[0] & 0x000000ff)):
@@ -296,19 +298,28 @@ fir = read_pulse_weights('pulse_weights.pkl')
 
 for i, d in enumerate(data):
 
-    print("processing file %d (%d samples - %f hours)" % (i, len(d), len(d) / 3.6e6))
+    print("# processing file %d (%d samples - %f hours)" % (i, len(d), len(d) / 3.6e6))
     suff = '_det%03d.svg' % i
+
+    print('#', d)
+    d = (d>>8) - 8388608
+    print('#', d)
+    for j, s in enumerate(d):
+        if j > 100000:
+            break
+        print(j, s)
 
     # amplitude spectrum
     peaks, peaks_max = find_peaks(d * 1., fir)
-    #plot_amplitude(peaks_max, suff)
+    plot_amplitude(peaks_max, suff)
+    #break
 
     # peaks vs time
     plot_peaks(peaks, peaks_max, suff)
 
     ### baseline vs time
-    ##base, base_min = baseline(d * 1., 10000)
-    ##plot_baseline(base, base_min, suff)
+    base, base_min = baseline(d * 1., 10000)
+    plot_baseline(base, base_min, suff)
 
     ### normalized pulse shape
     ##shapes = pulse_shapes(d * 1., peaks, 1000)
