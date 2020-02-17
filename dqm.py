@@ -18,11 +18,13 @@ import mimetypes
 import urlparse
 #import urllib.parse
 
-verb = 99
+verb = 1
 
-root_dir = "/home/dqm/dqm/xdqm-devel"
+root_dir = "./"
 plot_dir_live = "store/live"
 plot_dir_runs = "store/runs"
+plot_not_found = "store/plot_not_found.svg"
+web_root = "/"
 
 max_caption_file_size = 1024*1024
 max_static_page_size = 100*1024*1024
@@ -47,7 +49,8 @@ class PageStore(object):
         self._default = self.dummy_gen
 
     def _get_mimetypes(self, path):
-        return mimetypes.guess_type(path)[0]
+        #return mimetypes.guess_type(path)[0]
+        return mimetypes.guess_type(path)
 
     def set_default(self, func):
         self.default = func
@@ -55,12 +58,8 @@ class PageStore(object):
     def register(self, path, func):
         if path == "/" and self._default == self.dummy_gen:
             self._default = func
-        print ('Registering %s -> %s()' %(path, func))
+        print('Registering %s -> %s()' %(path, func))
         self.map[path] = func
-
-        for k,v in self.map.iteritems():
-        #for k,v in self.map.items():
-            print(k, v)
 
     def _is_static(self, path):
         if re.match("^/(css|static|store)/", path):
@@ -110,23 +109,32 @@ store = PageStore()
 
 def get_plots(plot_dir):
     i = 0
-    ext = "svg"
+    exts = ["svg.gz", "svgz", "svg", "png", "gif", "jpg", "jpeg"]
     paths = natural_sort(glob.iglob(plot_dir + "/*"))
     for p in paths:
         i += 1
         name = os.path.basename(p)
         msg(3, "Found directory %s" % p)
-        img_path = "%s/%s.%s" % (p, name, ext)
-        if not os.path.isfile(img_path):
+        file_found = False
+        for ext in exts:
+            img_path = "%s/%s.%s" % (p, name, ext)
+            if os.path.isfile(img_path) and not os.path.getsize(img_path) <= 50:
+                file_found = True
+                break
+
+        if not file_found:
             msg(1, "File %s was not found" % img_path)
-            continue
+            if os.path.isfile(plot_not_found):
+                img_path = plot_not_found
+            else:
+                continue
         
         caption_file = "%s/%s.cap" % (p, name)
         try:
             with open(caption_file) as f:
                 caption_text = f.read(max_caption_file_size);
         except IOError:
-            caption_text = ""
+            caption_text = name
 
         caption_label = "Plot %d" % i
         img_alt = caption_label
@@ -200,22 +208,67 @@ def get_run_list():
     r = natural_sort(r)
     for x in r:
         yield x
-            
+
 
 def gen_runs(environ):
     run_list = ""
     for r in get_run_list():
-        #FIXME: original from Philippe
-        #run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
-        path = environ.get('PATH_INFO')
-        if os.path.isdir(path + '/' + r):
-            runlist += build_page("templates/run.thtml", {"link": path + '/' + r , "run_num": r})
-        else:
-            run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
+        run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
 
     return "text/html", build_page("templates/main.thtml", {"content": run_list, "content_class": "runlist"})
 
-store.register("/runs", gen_runs)
+#store.register("/runs", gen_runs)
+
+def get_dir_list(path):
+    d = []
+    #for p in glob.iglob(os.path.join(plot_dir_runs, "*")):
+    for p in glob.iglob(os.path.join(path, "*")):
+        #if not re.match(r'.*/\d+$', p) or not os.path.isdir(p): # FIXME: this is the original version
+        #    continue
+        #r.append(os.path.basename(p))
+        if not re.match(r'.*/\d+$', p) and not os.path.isdir(p):
+            continue
+        d.append(os.path.basename(p))
+
+    if(len(d) == 0):
+        msg(1, "No dir found!")
+    d = natural_sort(d)
+    for x in d:
+        yield x
+
+def gen_plot_page_simple(environ):
+    path = environ.get('PATH_INFO')
+    ppath = os.path.join('store/', path.lstrip('/'))
+    return gen_plot_page(environ, ppath)
+
+def is_plot_dir(path):
+    name = os.path.basename(path)
+    return len(glob.glob(os.path.join(path, name + '.*'))) > 0
+
+def gen_navigation(environ):
+
+    params = urlparse.parse_qs(environ['QUERY_STRING'])
+    plot_path = ""
+    if params:
+        try:
+            plot_path = params["path"][0]
+        except KeyError:
+            msg(2, "Page run requested without passing a path")
+            pass
+
+    dir_list = ""
+    for r in get_dir_list(os.path.join(plot_dir_runs, plot_path.lstrip('/'))):
+        new_path = os.path.join(plot_path, r)
+        if is_plot_dir(os.path.join(plot_dir_runs, new_path)):
+            return gen_plot_page(environ, os.path.join(plot_dir_runs, plot_path))
+        dir_list += build_page("templates/run.thtml", {"link": "nav?path=%s" % new_path, "run_num": r})
+
+    return "text/html", build_page("templates/main.thtml", {"content": dir_list, "content_class": "runlist"})
+
+store.register("/nav", gen_navigation)
+store.register("/runs", gen_navigation)
+
+
 
 def application (environ, start_response):
 ##    # Returns a dictionary in which the values are lists
@@ -250,9 +303,12 @@ def application (environ, start_response):
 
     # Now content type is text/html
     response_headers = [
-        ('Content-Type', mime_type),
+        ('Content-Type', mime_type[0]),
         ('Content-Length', str(len(response_body)))
     ]
+
+    if mime_type[1]:
+        response_headers.append(('Content-Encoding', mime_type[1]))
 
     start_response(status, response_headers)
     return [response_body]
@@ -266,7 +322,7 @@ if __name__ == "__main__":
 
     #host, port = '132.166.9.40', 8051
     host, port = '192.168.3.152', 443
-#    host, port = 'localhost', 8051
+    #host, port = 'localhost', 8787
     httpd = make_server(host, port, application)
 
     print("Listening to http://%s:%d" % (host, port))
