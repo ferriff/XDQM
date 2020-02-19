@@ -98,7 +98,7 @@ def find_peaks(stream, weights, window=200, threshold=20., rise=10):
         if stream[i + rise] - stream[i] > threshold:
             m = np.argmax(stream[i:i + window])
             ampl = np.dot(stream[i + m - wM:i + m - wM + wL], weights)
-            print('# max found:', i, m, ampl)
+            #print('# max found:', i, m, ampl)
             peaks.append(i + m)
             peaks_max.append(ampl)
             i = i + window
@@ -225,7 +225,7 @@ def gp_set_defaults():
     gp.c('set label "{/=18 Canfranc Run}" at graph 1, graph 1.04 right')
     gp.c('set label 101 "Last updated on ".system("date -u \\"+%a %e %b %Y %R:%S %Z\\"") at screen .975, graph 1 rotate by 90 right font ",12" tc "#999999"')
     gp.c('hour(x) = x / 1000. / 3600.')
-    gp.c('odir = "' + global_odir + '"')
+    gp.c('odir = "' + global_odir + '/"')
 
 
 
@@ -423,7 +423,7 @@ for k in drc.keys():
     # discard runs with different setup # FIXME: may be improved
     if len(drc[k][:12]) != 12:
         continue
-    global_odir = k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root) + '/' + k[1] + '/' + k[2] + '/'
+    global_odir = os.path.join(k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root), k[1], k[2])
     os.makedirs(global_odir, exist_ok=True)
     data = []
     for f in drc[k][:12]:
