@@ -367,6 +367,16 @@ def plot_fft_data(freq, power, suffix):
     gp.c('set out')
 
 
+def plot_more_recent_than_data(plotdir, datainfo):
+    print(plotdir)
+    flist = glob.glob(os.path.join(plotdir, 'amplitude*00/*svg*')) # FIXME: better tool...
+    print(plotdir, os.path.join(plotdir, '*/*svg*'), flist, datainfo[0])
+    plot_time = -1
+    if len(flist) > 0:
+        plot_time = os.path.getmtime(flist[0])
+    data_time = os.path.getmtime(datainfo[0])
+    return plot_time > data_time
+
 
 cfg = parse_config('configuration.cfg')
 
@@ -416,14 +426,14 @@ global_odir = ""
 for k in drc.keys():
     if os.path.isfile(analyzed_runs):
         analyzed = pickle.load(open(analyzed_runs, 'rb'))
-    # skip analyzed runs
-    if k in analyzed.keys():
-        continue
     print('#', k, len(drc[k][:12]))
-    # discard runs with different setup # FIXME: may be improved
+    # discard runs with different setup # FIXME: has to be improved
     if len(drc[k][:12]) != 12:
         continue
+    # skip analyzed runs
     global_odir = os.path.join(k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root), k[1], k[2])
+    if k in analyzed.keys() and plot_more_recent_than_data(global_odir, drc[k]):
+        continue
     os.makedirs(global_odir, exist_ok=True)
     data = []
     for f in drc[k][:12]:
@@ -431,7 +441,7 @@ for k in drc.keys():
         #data.append(read_data(f))
         data.append(f)
         print('done')
-    #data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
+    ####data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
     analyze(data)
     analyzed[k] = True
     # dump updated list of analyzed runs
