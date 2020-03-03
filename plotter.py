@@ -10,6 +10,11 @@ import struct
 
 import PyGnuplot as gp
 
+from datetime import datetime
+
+class Parameters:
+    def __init__(self):
+        self.sampling_freq = 0
 
 def parse_config(filename):
     config = configparser.ConfigParser(inline_comment_prefixes='#')
@@ -24,6 +29,7 @@ def read_data(filename):
 
 
 def read_data_new_daq(filename):
+    global params
     f = open(filename, 'rb')
     # first 32 bits: endianness << 8 + NBits
     #   where Nbits tells if data are written with 32 or 25 bits
@@ -38,9 +44,9 @@ def read_data_new_daq(filename):
     nbits = int.from_bytes(s1, byteorder=endianness)
     # second 32 bits: sampling frequency encoded as float
     s = f.read(4)
-    sampling_freq = struct.unpack('f', s)[0]
+    params.sampling_freq = struct.unpack('f', s)[0]
     # data stream of 32 bits: data << 8 + flags
-    print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, sampling_freq))
+    print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, params.sampling_freq))
     #return np.fromfile(filename, dtype=np.dtype('i3, i1'))
     return np.fromfile(f, dtype=np.dtype(np.uint32))
 
@@ -92,7 +98,7 @@ def find_peaks(stream, weights, window=200, threshold=20., rise=10):
     peaks, peaks_max = [], []
     wM = np.argmax(weights)
     wL = len(weights)
-    i = wL
+    i = wL + 1
     sL =  len(stream) - window
     while i < sL:
         if stream[i + rise] - stream[i] > threshold:
@@ -143,13 +149,19 @@ def compute_rate(peaks, peaks_max, window=1000):
 
 def analyze(data):
 
+    global params
+
     fir = read_pulse_weights('pulse_weights.pkl')
     ## do plots for independent channels
     for i, f in enumerate(data):
 
         d = read_data_new_daq(f)
+        duration = len(d) / 3.6e3 / params.sampling_freq
+        # skipping runs of less than 28.8 seconds
+        if duration < 0.008:
+            continue
+        print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
         d = (d>>8)
-        print("# processing file %d (%d samples - %f hours)" % (i, len(d), len(d) / 3.6e6))
         suff = '_det%03d.svg' % i
 
         #for j, s in enumerate(d):
@@ -368,9 +380,7 @@ def plot_fft_data(freq, power, suffix):
 
 
 def plot_more_recent_than_data(plotdir, datainfo):
-    print(plotdir)
     flist = glob.glob(os.path.join(plotdir, 'amplitude*00/*svg*')) # FIXME: better tool...
-    print(plotdir, os.path.join(plotdir, '*/*svg*'), flist, datainfo[0])
     plot_time = -1
     if len(flist) > 0:
         plot_time = os.path.getmtime(flist[0])
@@ -379,6 +389,8 @@ def plot_more_recent_than_data(plotdir, datainfo):
 
 
 cfg = parse_config('configuration.cfg')
+
+params = Parameters()
 
 data = []
 
@@ -426,7 +438,7 @@ global_odir = ""
 for k in drc.keys():
     if os.path.isfile(analyzed_runs):
         analyzed = pickle.load(open(analyzed_runs, 'rb'))
-    print('#', k, len(drc[k][:12]))
+    #print('#', k, len(drc[k][:12]))
     # discard runs with different setup # FIXME: has to be improved
     if len(drc[k][:12]) != 12:
         continue
@@ -437,12 +449,13 @@ for k in drc.keys():
     os.makedirs(global_odir, exist_ok=True)
     data = []
     for f in drc[k][:12]:
-        print('going to load file', f)
+        print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
         #data.append(read_data(f))
         data.append(f)
-        print('done')
+        #print('done')
     ####data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
     analyze(data)
     analyzed[k] = True
     # dump updated list of analyzed runs
     pickle.dump(analyzed, open(analyzed_runs, 'wb'))
+    print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' processing done.')
