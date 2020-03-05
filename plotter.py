@@ -52,6 +52,27 @@ def read_data_new_daq(filename):
 
 
 
+def file_info(filename):
+    f = open(filename, 'rb')
+    # first 32 bits: endianness << 8 + NBits
+    #   where Nbits tells if data are written with 32 or 25 bits
+    s1 = f.read(1)
+    s3 = f.read(3)
+    endianness = None
+    if 'l' in s3.decode():
+        #print('# -->', s3)
+        endianness = 'little'
+    else:
+        endianness = 'big'
+    nbits = int.from_bytes(s1, byteorder=endianness)
+    # second 32 bits: sampling frequency encoded as float
+    s = f.read(4)
+    sampling_freq = struct.unpack('f', s)[0]
+    # data stream of 32 bits: data << 8 + flags
+    print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, sampling_freq))
+
+
+
 def read_pulse_weights(filename):
     return pickle.load(open(filename, 'rb'))
 
