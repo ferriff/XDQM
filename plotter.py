@@ -52,7 +52,7 @@ def read_data_new_daq(filename):
 
 
 
-def file_info(filename):
+def file_info(filename, dump = False):
     f = open(filename, 'rb')
     # first 32 bits: endianness << 8 + NBits
     #   where Nbits tells if data are written with 32 or 25 bits
@@ -70,6 +70,11 @@ def file_info(filename):
     sampling_freq = struct.unpack('f', s)[0]
     # data stream of 32 bits: data << 8 + flags
     print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, sampling_freq))
+    if dump:
+        d = np.fromfile(f, dtype=np.dtype(np.uint32), count = 1000)
+        d = (d>>8)
+        for j, s in enumerate(d):
+            print(j, s)
 
 
 
