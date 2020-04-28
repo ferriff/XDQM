@@ -185,6 +185,7 @@ def analyze(data):
         duration = len(d) / 3.6e3 / params.sampling_freq
         # skipping runs of less than 28.8 seconds
         if duration < 0.008:
+            print("# skipping file %d (%d samples - %f hours)" % (i, len(d), duration))
             continue
         print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
         d = (d>>8)
