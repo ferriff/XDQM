@@ -7,7 +7,7 @@ import numpy as np
 import os
 import pickle
 import struct
-
+import argparse
 import PyGnuplot as gp
 
 from datetime import datetime
@@ -26,7 +26,13 @@ def parse_config(filename):
 def read_data(filename):
     return np.fromfile(filename, dtype=np.dtype(np.int16))
 
-
+def parse_args():
+    '''Parses comand line arguments.'''
+    parser = argparse.ArgumentParser(description='CROSS DQM: analysis and plotting. Configuration is read from the file configuration.cfg')
+    parser.add_argument('--files', 
+                        help='Limit the analysis to a list of files. File paths must be provided in the FILES argument as comma separated list.')
+    
+    return parser.parse_args()
 
 def read_data_new_daq(filename):
     global params
@@ -427,62 +433,78 @@ data_root = '/mnt/samba/RUNS/RUN2/'
 plot_out_dir_root = '/home/dqm/dqm/xdqm-devel/store/runs/'
 analyzed_runs = 'analyzed_runs.dqm'
 
-# find files
-runs = glob.glob(data_root + '/**/*' + data_suff, recursive=True)
+def ana_dir(data_root, data_suff = '.bin'):
+    '''Analyses all data found in the directory data_root. It looks for data files
+with suffix data_suff.'''
 
-# find directories
-dirs = set()
-for r in runs:
-    dirs.add(os.path.dirname(r))
+    # find files
+    runs = glob.glob(data_root + '/**/*' + data_suff, recursive=True)
 
-# map files into dirs
-df = {}
-for d in dirs:
-    df[d] = []
-for r in runs:
-    df[os.path.dirname(r)].append(os.path.basename(r))
+    # find directories
+    dirs = set()
+    for r in runs:
+        dirs.add(os.path.dirname(r))
 
-# find run and chunk number
-run_chunk = {}
-for d in df.keys():
-    rc = set()
-    for r in df[d]:
-        v = r.replace(data_suff, '').split('_')
-        rc.add((v[0], v[3]))
-    run_chunk[d] = sorted(rc)
+        
+    # map files into dirs
+    df = {}
+    for d in dirs:
+        df[d] = []
+    for r in runs:
+        df[os.path.dirname(r)].append(os.path.basename(r))
 
-# map the files to a given dir, run, chunk
-drc = {}
-for d in run_chunk.keys():
-    for rc in run_chunk[d]:
-        drc[tuple([d] + list(rc))] = glob.glob(d + '/' + rc[0] + '_*_' + rc[1] + data_suff)
+    # find run and chunk number
+    run_chunk = {}
+    for d in df.keys():
+        rc = set()
+        for r in df[d]:
+            v = r.replace(data_suff, '').split('_')
+            rc.add((v[0], v[3]))
+        run_chunk[d] = sorted(rc)
 
-# ready to analyze runs
-# load list of analyzed runs
-analyzed = {}
+    # map the files to a given dir, run, chunk
+    drc = {}
+    for d in run_chunk.keys():
+        for rc in run_chunk[d]:
+            drc[tuple([d] + list(rc))] = glob.glob(d + '/' + rc[0] + '_*_' + rc[1] + data_suff)
 
-global_odir = ""
-for k in drc.keys():
-    if os.path.isfile(analyzed_runs):
-        analyzed = pickle.load(open(analyzed_runs, 'rb'))
-    #print('#', k, len(drc[k][:12]))
-    # discard runs with different setup # FIXME: has to be improved
-    if len(drc[k][:12]) != 12:
-        continue
-    # skip analyzed runs
-    global_odir = os.path.join(k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root), k[1], k[2])
-    if k in analyzed.keys() and plot_more_recent_than_data(global_odir, drc[k]):
-        continue
-    os.makedirs(global_odir, exist_ok=True)
-    data = []
-    for f in drc[k][:12]:
-        print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
-        #data.append(read_data(f))
-        data.append(f)
-        #print('done')
-    ####data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
-    analyze(data)
-    analyzed[k] = True
-    # dump updated list of analyzed runs
-    pickle.dump(analyzed, open(analyzed_runs, 'wb'))
-    print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' processing done.')
+    # ready to analyze runs
+    # load list of analyzed runs
+    analyzed = {}
+
+    global_odir = ""
+    for k in drc.keys():
+        if os.path.isfile(analyzed_runs):
+            analyzed = pickle.load(open(analyzed_runs, 'rb'))
+        # discard runs with different setup # FIXME: has to be improved        
+        if len(drc[k][:12]) != 12:
+            continue
+        # skip analyzed runs
+        global_odir = os.path.join(k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root), k[1], k[2])
+        if k in analyzed.keys() and plot_more_recent_than_data(global_odir, drc[k]):
+            continue
+        os.makedirs(global_odir, exist_ok=True)
+        data = []
+        for f in drc[k][:12]:
+            print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
+            #data.append(read_data(f))
+            data.append(f)
+            #print('done')
+        ####data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
+        print("Analyzing: " + ", ".join(data))
+        analyze(data)
+        analyzed[k] = True
+        # dump updated list of analyzed runs
+        pickle.dump(analyzed, open(analyzed_runs, 'wb'))
+        print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' processing done.')
+
+if __name__ == "__main__":
+    global global_odir
+    args = parse_args()
+    if args.files:
+        global_odir = "out"
+        print("Plots will be stored in the out directory.")
+        analyze(args.files.split(","))
+    else:
+        ana_dir(data_root)
+
