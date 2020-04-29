@@ -83,6 +83,14 @@ def read_pulse_weights(filename):
 
 
 
+def compute_pulse_weights(stream, peaks, window, filename='computed_weights.pkl'):
+    # find a window with one pulse only
+    
+    # save the pulse
+    pickle.save(open(filename, 'w'))
+
+
+
 #def running_mean(x, N):
 #    return np.convolve(x, np.ones((N,))/N, mode='valid')
 def running_mean(x, N):
@@ -420,11 +428,10 @@ params = Parameters()
 
 data = []
 
-# FIXME: to be added to the configuration file
-data_suff = '.bin'
-data_root = '/mnt/samba/RUNS/RUN2/'
-plot_out_dir_root = '/home/dqm/dqm/xdqm-devel/store/runs/'
-analyzed_runs = 'analyzed_runs.dqm'
+data_suff = cfg['data']['suffix']
+data_root = cfg['data']['root_dir']
+analyzed_runs = cfg['data']['log_analyzed_runs']
+plot_out_dir_root = cfg['plot']['output_dir']
 
 # find files
 runs = glob.glob(data_root + '/**/*' + data_suff, recursive=True)
