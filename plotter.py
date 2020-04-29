@@ -12,6 +12,8 @@ import PyGnuplot as gp
 
 from datetime import datetime
 
+from utils import volt
+
 class Parameters:
     def __init__(self):
         self.sampling_freq = 0
@@ -202,8 +204,9 @@ def analyze(data):
             print("# skipping file %d (%d samples - %f hours)" % (i, len(d), duration))
             continue
         print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
-        d = (d>>8)
+        d = volt(d)
         suff = '_det%03d.svg' % i
+        det  = '%03d' % i
 
         #for j, s in enumerate(d):
         #    if j > 100000:
@@ -212,28 +215,28 @@ def analyze(data):
 
         # amplitude spectrum
         peaks, peaks_max = find_peaks(d * 1., fir)
-        plot_amplitude(peaks_max, suff)
+        plot_amplitude(peaks_max, suff, det)
 
         # peaks vs time
-        plot_peaks(peaks, peaks_max, suff)
+        plot_peaks(peaks, peaks_max, suff, det)
 
         # baseline vs time
         base, base_min = baseline(d * 1., 10000)
-        plot_baseline(base, base_min, suff)
+        plot_baseline(base, base_min, suff, det)
 
         # normalized pulse shape
         shapes = pulse_shapes(d * 1., peaks, 1000)
-        plot_pulse_shapes(shapes, suff)
+        plot_pulse_shapes(shapes, suff, det)
 
         # power spectra
         # all samples
         p = np.abs(np.fft.rfft(d[len(d) - 100000:len(d)]))
         f = np.linspace(0, 1000/2, len(p))
-        plot_fft_data(f, p, suff)
+        plot_fft_data(f, p, suff, det)
 
         # rate
         rate = compute_rate(peaks, peaks_max, 100 * 1e3)
-        plot_rate(rate, 100, suff)
+        plot_rate(rate, 100, suff, det)
 
         ## rate FFT # FIXME: takes quite a long time
         #p = [0] * (peaks[len(peaks) - 1] + 1)
@@ -259,6 +262,10 @@ def analyze(data):
     # - baseline rms vs. time
 
 
+def detector_name(det):
+    global cfg
+    return cfg['setup']['ch%03d' % det].replace(' ', '_') # FIXME: better sanitize dir names
+
 
 def gp_set_defaults():
     global global_odir
@@ -282,11 +289,12 @@ def gp_set_defaults():
 
 
 
-def plot_amplitude(maxima, suffix):
+def plot_amplitude(maxima, suffix, det):
     fname = 'tmp_amplitude.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'amplitude%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'amplitude%s' % suff_noext), exist_ok=True)
     values, edges = np.histogram(maxima, bins=1500, range=(0, 15000), density=False)
     gp_set_defaults()
     gp.c('set out odir."amplitude%s/amplitude%s"' % (suff_noext, suffix))
@@ -299,11 +307,12 @@ def plot_amplitude(maxima, suffix):
 
 
 
-def plot_peaks(peaks, peaks_max, suffix):
+def plot_peaks(peaks, peaks_max, suffix, det):
     fname = 'tmp_peaks.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'peaks%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'peaks%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
     gp.c('set out odir."peaks%s/peaks%s"' % (suff_noext, suffix))
     gp.s([peaks, peaks_max], filename=fname)
@@ -317,11 +326,12 @@ def plot_peaks(peaks, peaks_max, suffix):
 
 
 
-def plot_baseline(base, base_min, suffix):
+def plot_baseline(base, base_min, suffix, det):
     fname = 'tmp_baseline.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'baseline%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'baseline%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
     gp.c('set out odir."baseline%s/baseline%s"' % (suff_noext, suffix))
     gp.s([base, base_min], filename=fname)
@@ -335,13 +345,14 @@ def plot_baseline(base, base_min, suffix):
 
 
 
-def plot_pulse_shapes(shapes, suffix):
+def plot_pulse_shapes(shapes, suffix, det):
 
     fname = 'tmp_shapes.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'shapes%s' % suff_noext), exist_ok=True)
-    os.makedirs(os.path.join(global_odir, 'normalized_shapes%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'shapes%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'normalized_shapes%s' % suff_noext), exist_ok=True)
     of = open(fname, 'w')
     for cnt, el in enumerate(shapes):
         for i, v in enumerate(el[0]):
@@ -365,11 +376,12 @@ def plot_pulse_shapes(shapes, suffix):
 
 
 
-def plot_rate(rate, window, suffix):
+def plot_rate(rate, window, suffix, det):
     fname = 'tmp_rate.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'rate%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'rate%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
     gp.c('set out odir."rate%s/rate%s"' % (suff_noext, suffix))
     gp.s([rate], filename=fname)
@@ -383,11 +395,12 @@ def plot_rate(rate, window, suffix):
 
 
 
-def plot_fft_rate(freq, power, suffix):
+def plot_fft_rate(freq, power, suffix, det):
     fname = 'tmp_fft_rate.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'fft_rate%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'fft_rate%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
     gp.c('set out odir."fft_rate%s/fft_rate%s"' % (suff_noext, suffix))
     gp.s([freq, power], filename=fname)
@@ -402,11 +415,12 @@ def plot_fft_rate(freq, power, suffix):
 
 
 
-def plot_fft_data(freq, power, suffix):
+def plot_fft_data(freq, power, suffix, det):
     fname = 'tmp_fft_data.dat'
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
-    os.makedirs(os.path.join(global_odir, 'fft_data%s' % suff_noext), exist_ok=True)
+    det_name = detector_name(det)
+    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'fft_data%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
     gp.c('set out odir."fft_data%s/fft_data%s"' % (suff_noext, suffix))
     gp.s([freq, power], filename=fname)
@@ -452,7 +466,6 @@ with suffix data_suff.'''
     for r in runs:
         dirs.add(os.path.dirname(r))
 
-        
     # map files into dirs
     df = {}
     for d in dirs:
@@ -504,6 +517,7 @@ with suffix data_suff.'''
         # dump updated list of analyzed runs
         pickle.dump(analyzed, open(analyzed_runs, 'wb'))
         print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' processing done.')
+
 
 if __name__ == "__main__":
     global global_odir
