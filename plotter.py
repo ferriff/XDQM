@@ -321,7 +321,10 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     gp.c('set ylabel "Amplitude (ADC count)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    pmin = np.quantile(peaks_max, 0.025)
+    pmax = np.quantile(peaks_max, 0.975)
+    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
+    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
     gp.c('set out')
 
 
@@ -340,7 +343,11 @@ def plot_baseline(base, base_min, suffix, det):
     gp.c('set ylabel "Amplitude (ADC count)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    pmin = np.quantile(base_min, 0.025)
+    pmax = np.quantile(base_min, 0.975)
+    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
+    #gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
     gp.c('set out')
 
 
