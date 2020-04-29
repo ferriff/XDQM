@@ -321,8 +321,8 @@ if __name__ == "__main__":
     #httpd = make_server('localhost', 8051, application)
 
     #host, port = '132.166.9.40', 8051
-    host, port = '192.168.3.152', 443
-    #host, port = 'localhost', 8787
+    #host, port = '192.168.3.152', 443
+    host, port = 'localhost', 8787
     httpd = make_server(host, port, application)
 
     print("Listening to http://%s:%d" % (host, port))

@@ -5,10 +5,12 @@ import glob
 #import numba as nb # FIXME: not available in the current devuan version
 import numpy as np
 import os
+import sys
 import pickle
 import struct
 import argparse
 import PyGnuplot as gp
+import filt_ana 
 
 from datetime import datetime
 
@@ -36,7 +38,7 @@ def parse_args():
     
     return parser.parse_args()
 
-def read_data_new_daq(filename):
+def read_data_new_daq(filename, nsamples = -1):
     global params
     f = open(filename, 'rb')
     # first 32 bits: endianness << 8 + NBits
@@ -56,7 +58,7 @@ def read_data_new_daq(filename):
     # data stream of 32 bits: data << 8 + flags
     print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, params.sampling_freq))
     #return np.fromfile(filename, dtype=np.dtype('i3, i1'))
-    return np.fromfile(f, dtype=np.dtype(np.uint32))
+    return np.fromfile(f, dtype=np.dtype(np.uint32), count = nsamples)
 
 
 
@@ -194,10 +196,33 @@ def analyze(data):
     global params
 
     fir = read_pulse_weights('pulse_weights.pkl')
+
+
+    signal_processing =  cfg.get('analysis', 'signal_processing', fallback = '')
+
+    if signal_processing == 'butterworth':
+        butterworth = True
+        print("Using Butterworth filter for signal processing")
+    else:
+        butterworth = False
+        
+    lfreq_default = cfg.getfloat('analysis', 'lfreq_default', fallback=3)
+    hfreq_default = cfg.getfloat('analysis', 'hfreq_default', fallback=300)
+    thr_default = cfg.getfloat('analysis', 'threshold_default', fallback=None)
+    lfreq = []
+    thr = []
+    hfreq = []
+    for i in range(len(data)):
+        lfreq.append(cfg.getfloat('analysis', 'lfreq_ch%03d', fallback=lfreq_default))
+        hfreq.append(cfg.getfloat('analysis', 'hfreq_ch%03d', fallback=hfreq_default))
+        thr.append(cfg.getfloat('analysis', 'thr_ch%003d', fallback=thr_default))
+
+    max_samples = cfg.getint('data', 'max_samples_per_file', fallback=-1)
+        
     ## do plots for independent channels
     for i, f in enumerate(data):
 
-        d = read_data_new_daq(f)
+        d = read_data_new_daq(f, max_samples)
         duration = len(d) / 3.6e3 / params.sampling_freq
         # skipping runs of less than 28.8 seconds
         if duration < 0.008:
@@ -206,7 +231,7 @@ def analyze(data):
         print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
         d = volt(d)
         suff = '_det%03d.svg' % i
-        det  = '%03d' % i
+        det = i + 1
 
         #for j, s in enumerate(d):
         #    if j > 100000:
@@ -214,7 +239,12 @@ def analyze(data):
         #    print('#', j, s)
 
         # amplitude spectrum
-        peaks, peaks_max = find_peaks(d * 1., fir)
+        if butterworth:
+            #TODO select freq depending on channel type
+            peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], params.sampling_freq, thr[i])
+        else:
+            peaks, peaks_max = find_peaks(d * 1., fir)
+            
         plot_amplitude(peaks_max, suff, det)
 
         # peaks vs time
@@ -294,13 +324,15 @@ def plot_amplitude(maxima, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'amplitude%s' % suff_noext), exist_ok=True)
-    values, edges = np.histogram(maxima, bins=1500, range=(0, 15000), density=False)
+    xmin = cfg.getfloat("plot", "min_ampl", fallback=0.)
+    xmax = cfg.getfloat("plot", "max_ampl", fallback=1.)
+    os.makedirs(os.path.join(global_odir, det_name, 'amplitude%s' % suff_noext), exist_ok=True)
+    values, edges = np.histogram(maxima, bins=1500, range=(xmin, xmax), density=False)
     gp_set_defaults()
-    gp.c('set out odir."amplitude%s/amplitude%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/amplitude%s/amplitude%s"' % (det_name, suff_noext, suffix))
     gp.c('set log y')
-    gp.c('set ylabel "Events / 10 ADC count"')
-    gp.c('set xlabel "Amplitude (ADC count)"')
+    gp.c('set ylabel "Events / V"')
+    gp.c('set xlabel "Amplitude (V)"')
     gp.s([edges[:-1], values], filename=fname)
     gp.c('plot [][0.1:] "'+fname+'" u 1:2 not w histep lt 6')
     gp.c('set out')
@@ -312,16 +344,19 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'peaks%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'peaks%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
-    gp.c('set out odir."peaks%s/peaks%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/peaks%s/peaks%s"' % (det_name, suff_noext, suffix))
     gp.s([peaks, peaks_max], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
-    gp.c('set ylabel "Amplitude (ADC count)"')
+    gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    pmin = np.percentile(peaks_max, 0.025)
+    pmax = np.percentile(peaks_max, 0.975)
+    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
+    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
     gp.c('set out')
 
 
@@ -331,16 +366,20 @@ def plot_baseline(base, base_min, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'baseline%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'baseline%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
-    gp.c('set out odir."baseline%s/baseline%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/baseline%s/baseline%s"' % (det_name, suff_noext, suffix))
     gp.s([base, base_min], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
-    gp.c('set ylabel "Amplitude (ADC count)"')
+    gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    pmin = np.percentile(base_min, 0.025)
+    pmax = np.percentile(base_min, 0.975)
+    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
+    #gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
+    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
     gp.c('set out')
 
 
@@ -351,8 +390,8 @@ def plot_pulse_shapes(shapes, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'shapes%s' % suff_noext), exist_ok=True)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'normalized_shapes%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'shapes%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'normalized_shapes%s' % suff_noext), exist_ok=True)
     of = open(fname, 'w')
     for cnt, el in enumerate(shapes):
         for i, v in enumerate(el[0]):
@@ -363,12 +402,12 @@ def plot_pulse_shapes(shapes, suffix, det):
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('load "blues.pal"')
-    gp.c('set ylabel "Amplitude (ADC count)"')
+    gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (ms)"')
-    gp.c('set out odir."normalized_shapes%s/normalized_shapes%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/normalized_shapes%s/normalized_shapes%s"' % (det_name, suff_noext, suffix))
     gp.c('plot [][] "'+fname+'" u 1:($2 / $4):3 not w l lt palette')
     gp.c('set out')
-    gp.c('set out odir."shapes%s/shapes%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/shapes%s/shapes%s"' % (det_name, suff_noext, suffix))
     #gp.c('set log y')
     gp.c('unset colorbox')
     gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
@@ -381,9 +420,9 @@ def plot_rate(rate, window, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'rate%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'rate%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
-    gp.c('set out odir."rate%s/rate%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/rate%s/rate%s"' % (det_name, suff_noext, suffix))
     gp.s([rate], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
@@ -400,9 +439,9 @@ def plot_fft_rate(freq, power, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'fft_rate%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'fft_rate%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
-    gp.c('set out odir."fft_rate%s/fft_rate%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/fft_rate%s/fft_rate%s"' % (det_name, suff_noext, suffix))
     gp.s([freq, power], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
@@ -420,9 +459,9 @@ def plot_fft_data(freq, power, suffix, det):
     global global_odir
     suff_noext, dummy = os.path.splitext(suffix)
     det_name = detector_name(det)
-    os.makedirs(os.path.join(global_odir, det + '_' + det_name, 'fft_data%s' % suff_noext), exist_ok=True)
+    os.makedirs(os.path.join(global_odir, det_name, 'fft_data%s' % suff_noext), exist_ok=True)
     gp_set_defaults()
-    gp.c('set out odir."fft_data%s/fft_data%s"' % (suff_noext, suffix))
+    gp.c('set out odir."%s/fft_data%s/fft_data%s"' % (det_name, suff_noext, suffix))
     gp.s([freq, power], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
@@ -458,8 +497,15 @@ def ana_dir(data_root, data_suff = '.bin'):
     '''Analyses all data found in the directory data_root. It looks for data files
 with suffix data_suff.'''
 
+    global global_odir
+    
     # find files
-    runs = glob.glob(data_root + '/**/*' + data_suff, recursive=True)
+    path_pattern = data_root + '/**/*' + data_suff
+    runs = glob.glob(path_pattern, recursive=True)
+
+    if len(runs) == 0:
+        print("No data to process while looking for pattern %s." % path_pattern, file=sys.stderr)
+
 
     # find directories
     dirs = set()
@@ -473,6 +519,7 @@ with suffix data_suff.'''
     for r in runs:
         df[os.path.dirname(r)].append(os.path.basename(r))
 
+            
     # find run and chunk number
     run_chunk = {}
     for d in df.keys():
@@ -500,7 +547,7 @@ with suffix data_suff.'''
         if len(drc[k][:12]) != 12:
             continue
         # skip analyzed runs
-        global_odir = os.path.join(k[0].replace('/mnt/samba/RUNS/', plot_out_dir_root), k[1], k[2])
+        global_odir = os.path.join(k[0].replace(os.path.dirname(data_root), plot_out_dir_root), k[1], k[2])
         if k in analyzed.keys() and plot_more_recent_than_data(global_odir, drc[k]):
             continue
         os.makedirs(global_odir, exist_ok=True)
@@ -517,7 +564,6 @@ with suffix data_suff.'''
         # dump updated list of analyzed runs
         pickle.dump(analyzed, open(analyzed_runs, 'wb'))
         print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' processing done.')
-
 
 if __name__ == "__main__":
     global global_odir
