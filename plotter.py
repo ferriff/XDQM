@@ -4,6 +4,7 @@ import configparser
 import glob
 #import numba as nb # FIXME: not available in the current devuan version
 import numpy as np
+from scipy import signal
 import os
 import sys
 import pickle
@@ -255,15 +256,22 @@ def analyze(data):
         base, base_min = baseline(d * 1., 10000)
         plot_baseline(base, base_min, suff, det)
 
-        # normalized pulse shape
-        shapes = pulse_shapes(d * 1., peaks, 1000)
-        plot_pulse_shapes(shapes, suff, det)
+        ## normalized pulse shape
+        #shapes = pulse_shapes(d * 1., peaks, 1000)
+        #plot_pulse_shapes(shapes, suff, det)
 
         # power spectra
         # all samples
-        p = np.abs(np.fft.rfft(d[len(d) - 100000:len(d)]))
-        f = np.linspace(0, 1000/2, len(p))
-        plot_fft_data(f, p, suff, det)
+        #p = np.abs(np.fft.rfft(d[len(d) - 100000:len(d)]))
+        #f = np.linspace(0, 1000/2, len(p))
+        #########p = np.abs(np.fft.fft(d[len(d) - 100000:len(d)]))**2
+        #########f = np.fft.fftfreq(len(p)) * params.sampling_freq
+        #########p = p.reshape(-1, 20).mean(axis = 1)
+        #########f = f.reshape(-1, 20).mean(axis = 1)
+        #########n = len(f)
+        #########plot_fft_data(f[1:n//2], p[1:n//2], suff, det)
+        f, Pxx_den = signal.welch(d, params.sampling_freq, nperseg = 25000)
+        plot_fft_data(f, Pxx_den, suff, det)
 
         # rate
         rate = compute_rate(peaks, peaks_max, 100 * 1e3)
@@ -301,7 +309,7 @@ def detector_name(det):
 def gp_set_defaults():
     global global_odir
     gp.c('reset')
-    gp.c('set terminal svg size 600,480 font "Helvetica,16" background "#ffffff"')
+    gp.c('set terminal svg size 600,480 font "Helvetica,16" background "#ffffff" enhanced')
     #gp.c('set terminal canvas size 600,480 font "Helvetica,16" enhanced mousing standalone background "#ffffff"')
     #gp.c('set terminal pdfcairo enhanced color solid font "Helvetica,16" size 5,4')
     #gp.c('set term pngcairo enhanced font "Helvetica,12"')
@@ -312,8 +320,8 @@ def gp_set_defaults():
     gp.c('set grid lc "#bbbbbb"')
     gp.c('set key samplen 1.5')
     gp.c('set tmargin 1.5')
-    gp.c('set label "{/=18:Bold CUPID }{/=16:Italic Data Quality Monitoring}{/:Normal \\ }" at graph 0, graph 1.04')
-    gp.c('set label "{/=18 Canfranc Run}" at graph 1, graph 1.04 right')
+    gp.c('set label "{/=16:Bold CUPID/CROSS }{/=14:Italic Data Quality Monitoring}{/:Normal \\ }" at graph 0, graph 1.04')
+    gp.c('set label "{/=16 Canfranc}" at graph 1, graph 1.04 right')
     gp.c('set label 101 "Last updated on ".system("date -u \\"+%a %e %b %Y %R:%S %Z\\"") at screen .975, graph 1 rotate by 90 right font ",12" tc "#999999"')
     gp.c('hour(x) = x / 1000. / 3600.')
     gp.c('odir = "' + global_odir + '/"')
@@ -351,13 +359,15 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     gp.s([peaks, peaks_max], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
+    gp.c('set ytics nomirror')
+    gp.c('set y2tics nomirror tc "#bbbbbb"')
     gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    pmin = np.percentile(peaks_max, 0.025)
-    pmax = np.percentile(peaks_max, 0.975)
-    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
-    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
+    pmin = np.quantile(peaks_max, 0.0025)
+    pmax = np.quantile(peaks_max, 0.9975)
+    gp.c('set yrange [%f:%f]' % (pmin * .975, pmax * 1.025))
+    gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
     gp.c('set out')
 
 
@@ -373,14 +383,16 @@ def plot_baseline(base, base_min, suffix, det):
     gp.s([base, base_min], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
+    gp.c('set ytics nomirror')
+    gp.c('set y2tics nomirror tc "#bbbbbb"')
     gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    pmin = np.percentile(base_min, 0.025)
-    pmax = np.percentile(base_min, 0.975)
-    gp.c('set y2range [%f:%f]"' % (pmin, pmax))
+    pmin = np.quantile(base_min, 0.0025)
+    pmax = np.quantile(base_min, 0.9975)
+    gp.c('set yrange [%f:%f]' % (pmin * .975, pmax * 1.025))
     #gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'"'+" u (hour($1)):($2) not w l lc '#555555', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
+    gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
     gp.c('set out')
 
 
@@ -467,10 +479,14 @@ def plot_fft_data(freq, power, suffix, det):
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set log y')
-    gp.c('set ylabel ""')
+    gp.c('set mytics 10')
+    gp.c('set log x')
+    gp.c('set mxtics 10')
+    gp.c('set ylabel "Power Spectral Density (V^2 / Hz)"')
+    #gp.c('set format y "%L"')
     gp.c('set xlabel "Frequency (Hz)"')
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    gp.c('plot [][] "'+fname+'" u ($1 / 3600.):2 not w l lt 6')
+    gp.c('plot [1:][] "'+fname+'" u 1:2 not w l lt 6')
     gp.c('set out')
 
 
