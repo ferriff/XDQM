@@ -91,8 +91,6 @@ def file_info(filename, dump = False):
 def read_pulse_weights(filename):
     return pickle.load(open(filename, 'rb'))
 
-
-
 def compute_pulse_weights(stream, peaks, window, filename='computed_weights.pkl'):
     # find a window with one pulse only
     
@@ -209,13 +207,16 @@ def analyze(data):
     lfreq_default = cfg.getfloat('analysis', 'lfreq_default', fallback=3)
     hfreq_default = cfg.getfloat('analysis', 'hfreq_default', fallback=300)
     thr_default = cfg.getfloat('analysis', 'threshold_default', fallback=None)
+    win_default = cfg.getfloat('analysis', 'peak_search_window', fallback=1.e-3)
     lfreq = []
     thr = []
     hfreq = []
+    win = []
     for i in range(len(data)):
         lfreq.append(cfg.getfloat('analysis', 'lfreq_ch%03d', fallback=lfreq_default))
         hfreq.append(cfg.getfloat('analysis', 'hfreq_ch%03d', fallback=hfreq_default))
         thr.append(cfg.getfloat('analysis', 'thr_ch%003d', fallback=thr_default))
+        win.append(cfg.getfloat('analysis', 'peak_search_window_ch%003d', fallback=win_default))
 
     max_samples = cfg.getint('data', 'max_samples_per_file', fallback=-1)
         
@@ -241,7 +242,7 @@ def analyze(data):
         # amplitude spectrum
         if butterworth:
             #TODO select freq depending on channel type
-            peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], params.sampling_freq, thr[i])
+            peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], params.sampling_freq, win[i], thr[i])
         else:
             peaks, peaks_max = find_peaks(d * 1., fir)
             
