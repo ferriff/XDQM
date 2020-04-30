@@ -83,7 +83,7 @@ def file_info(filename, dump = False):
     print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, sampling_freq))
     if dump:
         d = np.fromfile(f, dtype=np.dtype(np.uint32), count = 1000)
-        d = (d>>8)
+        d = volt(d)
         for j, s in enumerate(d):
             print(j, s)
 
@@ -207,7 +207,7 @@ def analyze(data):
         
     lfreq_default = cfg.getfloat('analysis', 'lfreq_default', fallback=3)
     hfreq_default = cfg.getfloat('analysis', 'hfreq_default', fallback=300)
-    thr_default = cfg.getfloat('analysis', 'threshold_default', fallback=None)
+    thr_default = cfg.getfloat('analysis', 'threshold_default', fallback=0.01)
     win_default = cfg.getfloat('analysis', 'peak_search_window', fallback=1.e-3)
     lfreq = []
     thr = []
@@ -260,16 +260,7 @@ def analyze(data):
         #shapes = pulse_shapes(d * 1., peaks, 1000)
         #plot_pulse_shapes(shapes, suff, det)
 
-        # power spectra
-        # all samples
-        #p = np.abs(np.fft.rfft(d[len(d) - 100000:len(d)]))
-        #f = np.linspace(0, 1000/2, len(p))
-        #########p = np.abs(np.fft.fft(d[len(d) - 100000:len(d)]))**2
-        #########f = np.fft.fftfreq(len(p)) * params.sampling_freq
-        #########p = p.reshape(-1, 20).mean(axis = 1)
-        #########f = f.reshape(-1, 20).mean(axis = 1)
-        #########n = len(f)
-        #########plot_fft_data(f[1:n//2], p[1:n//2], suff, det)
+        # power spectral density
         f, Pxx_den = signal.welch(d, params.sampling_freq, nperseg = 25000)
         plot_fft_data(f, Pxx_den, suff, det)
 
@@ -359,15 +350,12 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     gp.s([peaks, peaks_max], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
-    gp.c('set ytics nomirror')
-    gp.c('set y2tics nomirror tc "#bbbbbb"')
-    gp.c('set ylabel "Amplitude (V)"')
+    gp.c('set ylabel "Amplitude (V)\\n{/=12 (range containing 95% of the peaks)}"')
     gp.c('set xlabel "Time (h)"')
-    #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
-    pmin = np.quantile(peaks_max, 0.0025)
-    pmax = np.quantile(peaks_max, 0.9975)
-    gp.c('set yrange [%f:%f]' % (pmin * .975, pmax * 1.025))
-    gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) axis x1y2 not w l lt 6")
+    pmin = np.quantile(peaks_max, 0.025, axis = 0)
+    pmax = np.quantile(peaks_max, 0.975, axis = 0)
+    gp.c('set yrange [%f:%f]' % (pmin, pmax))
+    gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w imp lt 6")
     gp.c('set out')
 
 
@@ -390,7 +378,7 @@ def plot_baseline(base, base_min, suffix, det):
     #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
     pmin = np.quantile(base_min, 0.0025)
     pmax = np.quantile(base_min, 0.9975)
-    gp.c('set yrange [%f:%f]' % (pmin * .975, pmax * 1.025))
+    gp.c('set yrange [%f:%f]' % (pmin, pmax))
     #gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
     gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
     gp.c('set out')
