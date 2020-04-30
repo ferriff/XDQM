@@ -2,9 +2,7 @@
 
 import configparser
 import glob
-#import numba as nb # FIXME: not available in the current devuan version
 import numpy as np
-from scipy import signal
 import os
 import sys
 import pickle
@@ -14,6 +12,8 @@ import PyGnuplot as gp
 import filt_ana 
 
 from datetime import datetime
+from numba import jit
+from scipy import signal
 
 from utils import volt
 
@@ -27,7 +27,7 @@ def parse_config(filename):
     return config
 
 
-#@nb.jit
+@jit(nopython=True)
 def read_data(filename):
     return np.fromfile(filename, dtype=np.dtype(np.int16))
 
@@ -108,7 +108,7 @@ def running_mean(x, N):
 
 
 
-#FIXME: reactivate when numba is found @nb.jit(cache=True, nopython=True)
+@jit(cache=True, nopython=True)
 def baseline(stream, window):
     baseline, baseline_min = [], []
     i = 0
@@ -123,7 +123,7 @@ def baseline(stream, window):
 
 
 
-#@nb.jit(cache=True, nopython=True)
+@jit(cache=True, nopython=True)
 def pulse_shapes(stream, peaks, window):
     s = []
     lp = -len(peaks)
@@ -136,7 +136,7 @@ def pulse_shapes(stream, peaks, window):
 
 
 
-#FIXME: reactivate when numba is found @nb.jit(cache=True, nopython=True)
+@jit(cache=True, nopython=True)
 def find_peaks(stream, weights, window=200, threshold=20., rise=10):
     peaks, peaks_max = [], []
     wM = np.argmax(weights)
@@ -160,7 +160,6 @@ def find_peaks(stream, weights, window=200, threshold=20., rise=10):
 def compute_rate(peaks, peaks_max, window=1000):
     r = []
     tmp_peaks = []
-    #p = np.array(peaks)
     mP =  peaks[-1]
     pL = len(peaks)
     i = 1000
@@ -281,8 +280,6 @@ def analyze(data):
         #plot_fft_rate(f, Pxx_den, suff)
 
     # plots:
-    # - baseline
-    # - cumulative pulse shape (best: last N pulses, fading away the old ones)
     # - amplitude spectrum
     # - light vs. heat channels
     # - live streaming
@@ -301,8 +298,6 @@ def gp_set_defaults():
     global global_odir
     gp.c('reset')
     gp.c('set terminal svg size 600,480 font "Helvetica,16" background "#ffffff" enhanced')
-    #gp.c('set terminal canvas size 600,480 font "Helvetica,16" enhanced mousing standalone background "#ffffff"')
-    #gp.c('set terminal pdfcairo enhanced color solid font "Helvetica,16" size 5,4')
     #gp.c('set term pngcairo enhanced font "Helvetica,12"')
     gp.c('set encoding utf8')
     gp.c('set minussign')
@@ -375,11 +370,9 @@ def plot_baseline(base, base_min, suffix, det):
     gp.c('set y2tics nomirror tc "#bbbbbb"')
     gp.c('set ylabel "Amplitude (V)"')
     gp.c('set xlabel "Time (h)"')
-    #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
     pmin = np.quantile(base_min, 0.0025)
     pmax = np.quantile(base_min, 0.9975)
     gp.c('set yrange [%f:%f]' % (pmin, pmax))
-    #gp.c('plot [][] "'+fname+'" u (hour($1)):($2) not w l lt 6')
     gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
     gp.c('set out')
 
@@ -409,7 +402,6 @@ def plot_pulse_shapes(shapes, suffix, det):
     gp.c('plot [][] "'+fname+'" u 1:($2 / $4):3 not w l lt palette')
     gp.c('set out')
     gp.c('set out odir."%s/shapes%s/shapes%s"' % (det_name, suff_noext, suffix))
-    #gp.c('set log y')
     gp.c('unset colorbox')
     gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
     gp.c('set out')
@@ -429,7 +421,6 @@ def plot_rate(rate, window, suffix, det):
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set ylabel "Rate (Hz)"')
     gp.c('set xlabel "Time (h)"')
-    #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
     gp.c('plot [][] "'+fname+'" u ($0 / 3600.):($1/'+str(window)+') not w l lt 6')
     gp.c('set out')
 
@@ -449,7 +440,6 @@ def plot_fft_rate(freq, power, suffix, det):
     gp.c('set log y')
     gp.c('set ylabel ""')
     gp.c('set xlabel "Frequency (1/min)"')
-    #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
     gp.c('plot [][] "'+fname+'" u ($1 * 60):2 not w l lt 6')
     gp.c('set out')
 
@@ -473,7 +463,6 @@ def plot_fft_data(freq, power, suffix, det):
     gp.c('set ylabel "Power Spectral Density (V^2 / Hz)"')
     #gp.c('set format y "%L"')
     gp.c('set xlabel "Frequency (Hz)"')
-    #gp.c('plot [][-4000:0] "tmp.dat" u (hour($1)):($2) not w l lt 6')
     gp.c('plot [1:][] "'+fname+'" u 1:2 not w l lt 6')
     gp.c('set out')
 
