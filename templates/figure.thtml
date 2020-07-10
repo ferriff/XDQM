@@ -1,6 +1,6 @@
 <div class="figure">
   <div class="figure-content">
-    <img src="$img_path" alt="$img_alt"></img>
+    <a href="$hres_img_path"><img src="$lres_img_path" alt="$img_alt"></img></a>
   </div>
   <div class="figure-caption">
     <span class="caption-label">$caption_label</span><span class="caption-text">$caption_text</span>

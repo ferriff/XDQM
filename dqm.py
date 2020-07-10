@@ -1,12 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #Python 2 and 3 compatibility
 #Ref.: https://python-future.org/compatible_idioms.html
 from __future__ import print_function 
+from future.standard_library import install_aliases
+install_aliases()
 
 #End of Python 2 and 3 compatibility
 
-from wsgiref.simple_server import make_server
+#from wsgiref.simple_server import make_server
+from gevent.pywsgi import WSGIServer
 from cgi import parse_qs, escape
 
 import string
@@ -15,9 +18,13 @@ import os.path
 import webbrowser
 import re
 import mimetypes
-import urlparse
-#import urllib.parse
+import urllib.parse as urlparse
+import argparse
+import sys
+import copy
 
+#Message display verbosity. Default is 1.
+#Controlled with the -q (set to 0) and -v (increase by 1) options
 verb = 1
 
 root_dir = "./"
@@ -45,7 +52,7 @@ class PageStore(object):
     
     def __init__(self):
         self.map = {}
-        self.mimetypes = { ".css": "text/css", ".html": "text/html", ".htm": "text/html",  }
+        self.mimetypes = { ".css": "text/css", ".html": "text/html", ".htm": "text/html",  ".svg": "image/svg+xml", ".svgz": "image/svg+xml", "sgv.gz": "image/svg+xml" }
         self._default = self.dummy_gen
 
     def _get_mimetypes(self, path):
@@ -58,7 +65,7 @@ class PageStore(object):
     def register(self, path, func):
         if path == "/" and self._default == self.dummy_gen:
             self._default = func
-        print('Registering %s -> %s()' %(path, func))
+        msg(1, 'Registering %s -> %s()' %(path, func))
         self.map[path] = func
 
     def _is_static(self, path):
@@ -78,10 +85,11 @@ class PageStore(object):
         if not self.is_path_allowed(path):
             return ""
         try:
-            with open(root_dir + path) as f:
+            with open(root_dir + path, 'rb') as f:
                 return f.read(max_static_page_size)
         except:
-            msg(1, "Failed to read file %s%s" % (root_dir, path))
+            e = sys.exc_info()[0]
+            msg(1, "Failed to read file %s%s: %s" % (root_dir, path, e.msg))
             return ""
         
     def gen_page(self, environ):
@@ -103,29 +111,50 @@ class PageStore(object):
         except KeyError:
             pass
 
-        return func(environ)
+        page = list(func(environ))
+
+        if isinstance(page[1], str):
+            page[1] = page[1].encode('utf-8')
+        
+        return page
 
 store = PageStore()
 
+def _look_for_img(base, exts):
+    for ext in exts:
+        img_path = "%s.%s" % (base, ext)
+        if os.path.isfile(img_path) and not os.path.getsize(img_path) <= 50:
+            return img_path
+    return None
+
 def get_plots(plot_dir):
     i = 0
-    exts = ["svg.gz", "svgz", "svg", "png", "gif", "jpg", "jpeg"]
+    lres_exts = ["png", "gif", "jpg", "jpeg"]
+    hres_exts = ["svg.gz", "svgz", "svg"]
+    all_exts = list(set(lres_exts + hres_exts))
     paths = natural_sort(glob.iglob(plot_dir + "/*"))
     for p in paths:
         i += 1
         name = os.path.basename(p)
         msg(3, "Found directory %s" % p)
         file_found = False
-        for ext in exts:
-            img_path = "%s/%s.%s" % (p, name, ext)
-            if os.path.isfile(img_path) and not os.path.getsize(img_path) <= 50:
-                file_found = True
-                break
+        base = "%s/%s"  % (p, name)
+        hres_img_path = _look_for_img(base, hres_exts)
+        lres_img_path = _look_for_img(base, lres_exts)
+            
+        if lres_img_path and not hres_img_path:
+            msg(1, "Missing high-resolution image")
+            lres_img_path = hres_img_path
 
-        if not file_found:
-            msg(1, "File %s was not found" % img_path)
+        if hres_img_path and not lres_img_path:
+            msg(1, "Missing low-resolution image")
+            hres_img_path = lres_img_path
+                        
+        if not lres_img_path:
+            msg(1, "No image file %s/%s.xxx found. Supported extension: %s" % (p, name, " ".join(all_exts)))
             if os.path.isfile(plot_not_found):
-                img_path = plot_not_found
+                lres_img_path = plot_not_found
+                hres_img_path = plot_not_found
             else:
                 continue
         
@@ -138,15 +167,16 @@ def get_plots(plot_dir):
 
         caption_label = "Plot %d" % i
         img_alt = caption_label
-        yield {"img_path": img_path, "img_alt": img_alt, "caption_label": caption_label, "caption_text": caption_text }
+        yield {"lres_img_path": lres_img_path, "hres_img_path": hres_img_path, "img_alt": img_alt, "caption_label": caption_label, "caption_text": caption_text }
         
     if i == 0:
         msg(1, "No plot found under directory %s" % plot_dir)
 
+        
 def build_page(template_path, values):
     with open(template_path) as f:
         s = string.Template(f.read())
-
+        
     return s.substitute(values)
 
 def gen_plot_page(environ, plot_dir):
@@ -170,7 +200,6 @@ def gen_live(environ):
 store.register("/live", gen_live)
 
 def gen_run(environ):
-    print('>>>', environ)
     params = urlparse.parse_qs(environ['QUERY_STRING'])
     if not params:
         return gen_live(environ)
@@ -213,7 +242,7 @@ def get_run_list():
 def gen_runs(environ):
     run_list = ""
     for r in get_run_list():
-        run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r , "run_num": r})
+        run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r, "run_num": r})
 
     return "text/html", build_page("templates/main.thtml", {"content": run_list, "content_class": "runlist"})
 
@@ -257,10 +286,12 @@ def gen_navigation(environ):
             pass
 
     dir_list = ""
+    
     for r in get_dir_list(os.path.join(plot_dir_runs, plot_path.lstrip('/'))):
         new_path = os.path.join(plot_path, r)
         if is_plot_dir(os.path.join(plot_dir_runs, new_path)):
             return gen_plot_page(environ, os.path.join(plot_dir_runs, plot_path))
+        params['path'] = new_path
         dir_list += build_page("templates/run.thtml", {"link": "nav?path=%s" % new_path, "run_num": r})
 
     return "text/html", build_page("templates/main.thtml", {"content": dir_list, "content_class": "runlist"})
@@ -291,13 +322,7 @@ def application (environ, start_response):
 ##    }
 ##
 
-    msg(9, "Hello")
-    
     mime_type, response_body = store.gen_page(environ)
-
-    msg(9, "Returning page of type %s:\n%s" % (mime_type, response_body))
-
-#    mime_type, response_body = ("text", "Hello!")
 
     status = '200 OK'
 
@@ -318,14 +343,21 @@ def application (environ, start_response):
 
 if __name__ == "__main__":
 
-    #httpd = make_server('localhost', 8051, application)
+    parser = argparse.ArgumentParser(description='Cupid/Cross data quality monitoring web server')
+    parser.add_argument('--host', '-H', default='192.168.3.152', help='Specifies host.')
+    parser.add_argument('--port', '-p', default=8787, type=int, help='Specifies port to listen to.')
+    parser.add_argument('--verbose', '-v', action='count', default=1, help='Increase verbosity')
+    parser.add_argument('--quiet', '-q', action='count', default=1, help='Quiet mode. Reduces message at the minium.')
+    opt = parser.parse_args()
+    verb = opt.verbose
 
-    #host, port = '132.166.9.40', 8051
-    #host, port = '192.168.3.152', 443
-    host, port = 'localhost', 8787
-    httpd = make_server(host, port, application)
+    if opt.quiet:
+        verb = 0
 
-    print("Listening to http://%s:%d" % (host, port))
+    http_server = WSGIServer((opt.host, opt.port), application)
+    http_server.serve_forever()
+    
+    msg(1, "Listening to http://%s:%d" % (opt.host, opt.port))
 
 #    webbrowser.open("http://localhost:8051")
     
