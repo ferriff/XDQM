@@ -51,7 +51,7 @@ def plot_amplitude(maxima, suffix, det):
     gp.s([edges[:-1], values], filename=fname)
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/amplitude%s/amplitude.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/amplitude%s/amplitude%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u 1:2 not w histep lt 6')
         gp.c('set out')
 
@@ -72,7 +72,7 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     gp.c('set yrange [%f:%f]' % (pmin, pmax))
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/peaks%s/peaks.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/peaks%s/peaks%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w imp lt 6")
         gp.c('set out')
 
@@ -95,7 +95,7 @@ def plot_baseline(base, base_min, suffix, det):
     gp.c('set yrange [%f:%f]' % (pmin, pmax))
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/baseline%s/baseline.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/baseline%s/baseline%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
         gp.c('set out')
 
@@ -121,10 +121,10 @@ def plot_pulse_shapes(shapes, suffix, det):
     gp.c('set xlabel "Time (ms)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/normalized_shapes%s/normalized_shapes.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/normalized_shapes%s/normalized_shapes%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u 1:($2 / $4):3 not w l lt palette')
         gp.c('set out')
-        gp.c('set out odir."%s/shapes%s/shapes.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/shapes%s/shapes%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('unset colorbox')
         gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
         gp.c('set out')
@@ -143,7 +143,7 @@ def plot_rate(rate, window, suffix, det):
     gp.c('set xlabel "Time (h)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/rate%s/rate.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/rate%s/rate%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u ($0 / 3600.):($1/'+str(window)+') not w l lt 6')
         gp.c('set out')
 
@@ -162,7 +162,7 @@ def plot_fft_rate(freq, power, suffix, det):
     gp.c('set xlabel "Frequency (1/min)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/fft_rate%s/fft_rate.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/fft_rate%s/fft_rate%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u ($1 * 60):2 not w l lt 6')
         gp.c('set out')
 
@@ -185,6 +185,6 @@ def plot_fft_data(freq, power, suffix, det):
     gp.c('set xlabel "Frequency (Hz)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
-        gp.c('set out odir."%s/fft_data%s/fft_data.%s"' % (det_name, suffix, ext))
+        gp.c('set out odir."%s/fft_data%s/fft_data%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [1:][] "'+fname+'" u 1:2 not w l lt 6')
         gp.c('set out')
