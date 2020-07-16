@@ -33,11 +33,15 @@ class detinfo:
         """Add values to the given observable"""
         if   obs == 'peak':
             p, p_m = values
+            if len(p) == 0:
+                return
             i = bisect.bisect_left(self.peak, p[0])
             self.peak = self.peak[:i] + p
             self.peak_max = self.peak_max[:i] + p_m
         elif obs == 'baseline':
             b, b_m = values
+            if len(b) == 0:
+                return
             i = bisect.bisect_left(self.baseline, b[0])
             self.baseline = self.baseline[:i] + b
             self.baseline_min = self.baseline_min[:i] + b_m
