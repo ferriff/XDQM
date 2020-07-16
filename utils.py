@@ -51,7 +51,7 @@ class DataReader:
 Usage: h = DataReader(['file1', 'file2', 'file3',..], nsamples_in_a_chunck)
        for chunk in h:
             ...analyse chunk, a numpy array with time samples...
-            print("Progress: %.1f%%" % h.progress()*100.)
+            print("Progress: %.1f%%" % (h.progress()*100.))
 '''
     def __init__(self, files, chunck_size):
         '''Initializes the data reader. The list of files to read (name or file objects)
