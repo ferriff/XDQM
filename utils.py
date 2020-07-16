@@ -6,12 +6,17 @@ import sys
 import os
 from numba import jit
 
+
 def clear():
     plt.cla()
     plt.clf()
 
+
+
 def show():
     plt.show(block=False)
+
+
 
 def plot(h, ylog = True):
     clear()
@@ -19,7 +24,10 @@ def plot(h, ylog = True):
     plt.step(*h.data)
     show()
 
+
+
 from scipy.signal import butter, lfilter
+
 
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -30,10 +38,13 @@ def butter_bandpass(lowcut, highcut, fs, order=5):
     return b, a
 
 
+
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
     y = lfilter(b, a, data)
     return y
+
+
 
 class DataReader:
     '''Class to read cross data from Run 2 DAQ.
@@ -43,7 +54,7 @@ Usage: h = DataReader(['file1', 'file2', 'file3',..], nsamples_in_a_chunck)
             print("Progress: %.1f%%" % h.progress()*100.)
 '''
     def __init__(self, files, chunck_size):
-        '''Initialises the data reader. The list of files to read (name or file objects)
+        '''Initializes the data reader. The list of files to read (name or file objects)
 is provided in the parameter files and the number of sample is each returned
 data chunk in the parameter chunck_size'''
         
@@ -130,6 +141,8 @@ data chunk in the parameter chunck_size'''
     def progress(self):
         return self.nread / self.tot_bytes
 
+
+
 class Hist1D(object):
 
     def __init__(self, nbins, xlow, xhigh):
@@ -147,12 +160,18 @@ class Hist1D(object):
     def data(self):
         return self.bins, self.hist
 
+
+
 def make_filter(nped, nrise, npeak):
     return np.array([-1./nped]*nped + [0]*nrise + [1./npeak] * npeak)
+
+
 
 @jit(nopython=True)
 def peak_finder(a, thr = 0.):
     return np.array([ a[i] if a[i-1] < a[i] and a[i] > a[i+1] and a[i] > thr else 0 for i in range(len(a) - 2) ])
+
+
 
 @jit(nopython=True)
 def peak_finder_window(a, width, thr = 0.):
@@ -183,11 +202,15 @@ def peak_finder_window(a, width, thr = 0.):
     stream.extend([0] * (len(a) - len(stream)))
         
     return np.array(stream)
-                
 
+
+
+@jit(cache=True, nopython=True)
 def volt(raw):
-    scale = 10.24/(1<<31)
-    return raw*scale-10.24
+    scale = 10.24 / (1<<31)
+    return raw * scale - 10.24
+
+
 
 h = Hist1D(10000, 0., 1)
 sig_filter = make_filter(50, 10, 1)
