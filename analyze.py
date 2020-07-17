@@ -8,10 +8,9 @@ from scipy import signal
 # DQM modules
 import configure as cfg
 import filt_ana 
-#import plot      as plt
 import accumulator
 
-from utils import volt
+from utils import volt, DataReader
 
 
 @jit(nopython=True)
@@ -198,6 +197,8 @@ samples apart of <rise> samples, in a given <window>'''
 def compute_rate(peaks, peaks_max, window=1000):
     '''Compute the number of peaks in a given sliding window'''
     r = []
+    if len(peaks) == 0:
+        return r
     tmp_peaks = []
     mP =  peaks[-1]
     pL = len(peaks)
@@ -263,57 +264,64 @@ def analyze(data, acc):
     ## analyze independent channels
     for i, f in enumerate(data):
 
-        d = read_data(f, max_samples)
-        duration = len(d) / 3.6e3 / cfg.params.sampling_freq
-        # skipping runs of less than 28.8 seconds
-        if duration < 0.008:
-            print("# skipping file %d (%d samples - %f hours)" % (i, len(d), duration))
-            continue
-        print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
-        d = volt(d)
-        suff = '_det%03d' % i
-        det = i + 1
+        print('Processing file', f, '(%d)' % i)
+        # to avoid a too big file loaded in RAM, split the reading in parts
+        # and accumulate the results in acc
+        #d = read_data(f, max_samples)
+        h = DataReader(f, max_samples)
+        for d in h:
+            cfg.params.sampling_freq = h.sampling_freq
+            duration = len(d) / 3.6e3 / cfg.params.sampling_freq
+            # skipping runs of less than 28.8 seconds
+            if duration < 0.008:
+                print("# skipping file/chunk %d (%d samples - %f hours)" % (i, len(d), duration))
+                continue
+            ###print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
+            print("Progress: %.1f%%" % (h.progress()*100.))
+            d = volt(d)
+            suff = '_det%03d' % i
+            det = i + 1
 
-        #compute_pulse_weights(d, 200)
+            #compute_pulse_weights(d, 200)
 
-        #for j, s in enumerate(d):
-        #    if j > 100000:
-        #        break
-        #    print('#', j, s)
+            #for j, s in enumerate(d):
+            #    if j > 100000:
+            #        break
+            #    print('#', j, s)
 
-        # amplitude spectrum
-        if butterworth:
-            #TODO select freq depending on channel type
-            peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], cfg.params.sampling_freq, win[i], thr[i])
-        else:
-            peaks, peaks_max = find_peaks(d * 1., fir)
-            
-        acc.add(det, 'peak', (peaks, peaks_max))
+            # amplitude spectrum
+            if butterworth:
+                #TODO select freq depending on channel type
+                peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], cfg.params.sampling_freq, win[i], thr[i])
+            else:
+                peaks, peaks_max = find_peaks(d * 1., fir)
+                
+            acc.add(det, 'peak', (peaks, peaks_max))
 
-        # store peak positions and amplitudes for 
-        # correlation analysis
-        #corr_peaks[1] = (peaks, peaks_max)
+            # store peak positions and amplitudes for 
+            # correlation analysis
+            #corr_peaks[1] = (peaks, peaks_max)
 
-        # baseline vs time
-        base, base_min = baseline(d * 1., 10000)
-        acc.add(det, 'baseline', (base, base_min))
+            # baseline vs time
+            base, base_min = baseline(d * 1., 10000)
+            acc.add(det, 'baseline', (base, base_min))
 
-        ## normalized pulse shape
-        #shapes = pulse_shapes(d * 1., peaks, 1000)
-        #plot_pulse_shapes(shapes, suff, det)
+            ## normalized pulse shape
+            #shapes = pulse_shapes(d * 1., peaks, 1000)
+            #plot_pulse_shapes(shapes, suff, det)
 
-        # power spectral density
-        f, Pxx_den = signal.welch(d, cfg.params.sampling_freq, nperseg = 25000)
-        acc.add(det, 'fft', (f, Pxx_den))
+            # power spectral density
+            f, Pxx_den = signal.welch(d, cfg.params.sampling_freq, nperseg = 25000)
+            acc.add(det, 'fft', (f, Pxx_den))
 
-        ## rate FFT # FIXME: takes quite a long time
-        #p = [0] * (peaks[len(peaks) - 1] + 1)
-        #for el in peaks:
-        #    p[el] = 1.
-        ##p = np.abs(np.fft.rfft(p[:10000]))
-        ##p = np.abs(np.fft.rfft(rate))
-        ##f = np.linspace(0, 1/2, len(p))
-        ##plot_fft_rate(f, p, suff)
-        #from scipy import signal
-        #f, Pxx_den = signal.periodogram(p[:10000], 1)
-        #plot_fft_rate(f, Pxx_den, suff)
+            ## rate FFT # FIXME: takes quite a long time
+            #p = [0] * (peaks[len(peaks) - 1] + 1)
+            #for el in peaks:
+            #    p[el] = 1.
+            ##p = np.abs(np.fft.rfft(p[:10000]))
+            ##p = np.abs(np.fft.rfft(rate))
+            ##f = np.linspace(0, 1/2, len(p))
+            ##plot_fft_rate(f, p, suff)
+            #from scipy import signal
+            #f, Pxx_den = signal.periodogram(p[:10000], 1)
+            #plot_fft_rate(f, Pxx_den, suff)
