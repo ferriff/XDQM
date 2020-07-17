@@ -2,6 +2,8 @@ import configure as cfg
 
 import bisect
 import numpy as np
+import plot      as plt
+import analyze   as ana
 
 
 class accumulator:
@@ -14,6 +16,28 @@ class accumulator:
         if det not in self.det.keys():
             self.det[det] = detinfo()
         self.det[det].add(obs, values)
+
+    def plot(self):
+        # plot channels
+        for det in self.det.keys():
+            suff = '_det%03d' % (det - 1)
+
+            d = self.det[det]
+
+            plt.plot_amplitude(d.peak_max, suff, det)
+            # peaks vs time
+            plt.plot_peaks(d.peak, d.peak_max, suff, det)
+            # baseline
+            plt.plot_baseline(d.baseline, d.baseline_min, suff, det)
+            # average fft
+            plt.plot_fft_data(d.fft_f, d.fft, suff, det)
+            # rate for signals above threshold
+            rate = ana.compute_rate(d.peak, d.peak_max, 100 * 1e3)
+            plt.plot_rate(rate, 100, suff, det)
+
+    def clear(self):
+        for key, val in self.det.items():
+            val.clear()
 
 
 class detinfo:
@@ -57,3 +81,6 @@ class detinfo:
             self.fft_n += 1
         else:
             print('detinfo.add: object %s not supported', obs)
+
+    def clear(self):
+        self.__init__()
