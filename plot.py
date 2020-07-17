@@ -3,7 +3,14 @@ import configure as cfg
 import os
 import numpy as np
 import PyGnuplot as gp
+import tempfile
 
+fn_collector = []
+
+def clean_tmpfiles():
+    for fn in fn_collector:
+        if os.path.isfile(fn):
+            os.remove(fn)
 
 def detector_name(det):
     return cfg.cfg['setup']['ch%03d' % det].replace(' ', '_') # FIXME: better sanitize dir names
@@ -31,13 +38,12 @@ def gp_set_defaults():
     gp.c('set label "{/=16 Canfranc}" at graph 1, graph 1.04 right')
     gp.c('set label 101 "Last updated on ".system("date -u \\"+%a %e %b %Y %R:%S %Z\\"") at screen .975, graph 1 rotate by 90 right font ",12" tc "#999999"')
     gp.c('hour(x) = x / 1000. / 3600.')
-    print(cfg.global_odir)
     gp.c('odir = "' + cfg.global_odir + '/"')
 
 
 
 def plot_amplitude(maxima, suffix, det):
-    fname = 'tmp_amplitude.dat'
+    dummy, fname = tempfile.mkstemp(prefix='tmp_amplitude_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
     xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
@@ -54,11 +60,14 @@ def plot_amplitude(maxima, suffix, det):
         gp.c('set out odir."%s/amplitude%s/amplitude%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u 1:2 not w histep lt 6')
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_peaks(peaks, peaks_max, suffix, det):
-    fname = 'tmp_peaks.dat'
+    if len(peaks) == 0:
+        return
+    dummy, fname = tempfile.mkstemp(prefix='tmp_peaks_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'peaks%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -75,11 +84,14 @@ def plot_peaks(peaks, peaks_max, suffix, det):
         gp.c('set out odir."%s/peaks%s/peaks%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w imp lt 6")
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_baseline(base, base_min, suffix, det):
-    fname = 'tmp_baseline.dat'
+    if len(base) == 0:
+        return
+    dummy, fname = tempfile.mkstemp(prefix='tmp_baseline_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'baseline%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -98,12 +110,12 @@ def plot_baseline(base, base_min, suffix, det):
         gp.c('set out odir."%s/baseline%s/baseline%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_pulse_shapes(shapes, suffix, det):
-
-    fname = 'tmp_shapes.dat'
+    dummy, fname = tempfile.mkstemp(prefix='tmp_shapes_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'shapes%s' % suffix), exist_ok=True)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'normalized_shapes%s' % suffix), exist_ok=True)
@@ -128,11 +140,12 @@ def plot_pulse_shapes(shapes, suffix, det):
         gp.c('unset colorbox')
         gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_rate(rate, window, suffix, det):
-    fname = 'tmp_rate.dat'
+    dummy, fname = tempfile.mkstemp(prefix='tmp_rate_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'rate%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -146,11 +159,12 @@ def plot_rate(rate, window, suffix, det):
         gp.c('set out odir."%s/rate%s/rate%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u ($0 / 3600.):($1/'+str(window)+') not w l lt 6')
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_fft_rate(freq, power, suffix, det):
-    fname = 'tmp_fft_rate.dat'
+    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_rate_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'fft_rate%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -165,11 +179,12 @@ def plot_fft_rate(freq, power, suffix, det):
         gp.c('set out odir."%s/fft_rate%s/fft_rate%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [][] "'+fname+'" u ($1 * 60):2 not w l lt 6')
         gp.c('set out')
+    fn_collector.append(fname)
 
 
 
 def plot_fft_data(freq, power, suffix, det):
-    fname = 'tmp_fft_data.dat'
+    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_data_', suffix='.dat', dir='.', text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'fft_data%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -188,3 +203,4 @@ def plot_fft_data(freq, power, suffix, det):
         gp.c('set out odir."%s/fft_data%s/fft_data%s.%s"' % (det_name, suffix, suffix, ext))
         gp.c('plot [1:][] "'+fname+'" u 1:2 not w l lt 6')
         gp.c('set out')
+    fn_collector.append(fname)
