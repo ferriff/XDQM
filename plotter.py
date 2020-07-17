@@ -37,7 +37,6 @@ with suffix data_suff.'''
     if len(runs) == 0:
         print("No data to process while looking for pattern %s." % path_pattern, file=sys.stderr)
 
-
     # find directories
     dirs = set()
     for r in runs:
@@ -48,22 +47,29 @@ with suffix data_suff.'''
     for d in dirs:
         df[d] = []
     for r in runs:
+        # extract dirname and filename from file full path
         df[os.path.dirname(r)].append(os.path.basename(r))
 
-            
     # find run and chunk number
     run_chunk = {}
+    # for each directory in the list
     for d in df.keys():
         rc = set()
-        for r in df[d]:
-            v = r.replace(data_suff, '').split('_')
+        # for each file in the directory
+        for f in df[d]:
+            v = f.replace(data_suff, '').split('_')
+            # store a pair (run_number, chunk_number)
             rc.add((v[0], v[3]))
+        # for each directory, store a sorted list of (run_number, chunk_number)
         run_chunk[d] = sorted(rc)
 
+    # reorganize the structure to
     # map the files to a given dir, run, chunk
     drc = {}
     for d in run_chunk.keys():
         for rc in run_chunk[d]:
+            # the key   is a tuple (directory, run, chunk)
+            # the value is the list of the files in directory corresponding to run and chunk
             drc[tuple([d] + list(rc))] = glob.glob(d + '/' + rc[0] + '_*_' + rc[1] + data_suff)
 
     # ready to analyze runs
@@ -74,7 +80,7 @@ with suffix data_suff.'''
     for k in drc.keys():
         if os.path.isfile(cfg.analyzed_runs):
             analyzed = pickle.load(open(cfg.analyzed_runs, 'rb'))
-        # discard runs with different setup # FIXME: has to be improved        
+        # discard runs with different setup than 12 channels # FIXME: has to be improved        
         if len(drc[k][:12]) != 12:
             continue
         # skip analyzed runs
@@ -85,12 +91,13 @@ with suffix data_suff.'''
         data = []
         for f in drc[k][:12]:
             print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
-            #data.append(read_data(f))
             data.append(f)
             #print('done')
-        ####data.append('/mnt/samba/RUNS/RUN2/Xmas_run/000001_20191222T054757_001_001.bin')
         print("Analyzing: " + ", ".join(data))
         ana.analyze(data, acc)
+        # plot the run every chunk
+        acc.plot()
+        acc.clear()
         analyzed[k] = True
         # dump updated list of analyzed runs
         pickle.dump(analyzed, open(cfg.analyzed_runs, 'wb'))
@@ -112,24 +119,9 @@ if __name__ == "__main__":
     acc = accumulator.accumulator()
     if args.files:
         cfg.global_odir = "out"
-        print("Plots will be stored in the out directory.")
+        print("Plots will be stored in the `out' directory.")
         ana.analyze(args.files.split(","), acc)
     else:
         ana_dir(cfg.data_root, acc)
 
-    # plot channels
-    for det in acc.det.keys():
-        suff = '_det%03d' % (det - 1)
-
-        d = acc.det[det]
-
-        plt.plot_amplitude(d.peak_max, suff, det)
-        # peaks vs time
-        plt.plot_peaks(d.peak, d.peak_max, suff, det)
-        # baseline
-        plt.plot_baseline(d.baseline, d.baseline_min, suff, det)
-        # average fft
-        plt.plot_fft_data(d.fft_f, d.fft, suff, det)
-        # rate for signals above threshold
-        rate = ana.compute_rate(d.peak, d.peak_max, 100 * 1e3)
-        plt.plot_rate(rate, 100, suff, det)
+    plt.clean_tmpfiles()
