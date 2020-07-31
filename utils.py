@@ -48,28 +48,30 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
 
 class DataReader:
     '''Class to read cross data from Run 2 DAQ.
-Usage: h = DataReader(['file1', 'file2', 'file3',..], nsamples_in_a_chunck)
+Usage: h = DataReader(['file1', 'file2', 'file3',..], nsamples_in_a_chunk)
        for chunk in h:
             ...analyse chunk, a numpy array with time samples...
             print("Progress: %.1f%%" % (h.progress()*100.))
 '''
-    def __init__(self, files, chunck_size):
+    def __init__(self, files, chunk_size, n_max_chunk=-1):
         '''Initializes the data reader. The list of files to read (name or file objects)
 is provided in the parameter files and the number of sample is each returned
-data chunk in the parameter chunck_size'''
+data chunk in the parameter chunk_size'''
         
         if isinstance(files, list) or isinstance(files, tuple):
             self.files = files            
         else:
             self.files = (files,)
 
-        self.chunck_size = chunck_size
+        self.chunk_size = chunk_size
+        self.n_max_chunk = n_max_chunk
         self._init_tot_size()
         self._init_counters()
         
     def _init_counters(self):
         self.ifile = -1
-        self.last_chunck_size = 0
+        self.ichunk = -1
+        self.last_chunk_size = 0
         self.nread = 0        
         
     def _init_tot_size(self):
@@ -101,7 +103,8 @@ data chunk in the parameter chunck_size'''
         return self.f
 
     def __next__(self):
-        toread = self.chunck_size * 4
+        self.ichunk += 1
+        toread = self.chunk_size * 4
         blocks = []
         while toread > 0 and self.f:
             b =  self.f.read(toread)
@@ -112,15 +115,15 @@ data chunk in the parameter chunck_size'''
             else: #end of file
                 self._nextfile()
 
-        if len(blocks) == 0:
+        if len(blocks) == 0 or (self.n_max_chunk > 0 and self.ichunk >= self.n_max_chunk):
             raise StopIteration
                 
-        chunck =  np.concatenate(blocks)
+        chunk =  np.concatenate(blocks)
         for i in range(len(blocks)):
             blocks[i] = None
-        self.last_chunk_size = len(chunck)
+        self.last_chunk_size = len(chunk)
         
-        return chunck
+        return chunk
        
     def _nextfile(self):
         self.ifile += 1

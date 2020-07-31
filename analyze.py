@@ -260,6 +260,7 @@ def analyze(data, acc):
         win.append(cfg.cfg.getfloat('analysis', 'peak_search_window_ch%003d', fallback=win_default))
 
     max_samples = cfg.cfg.getint('data', 'max_samples_per_file', fallback=-1)
+    n_max_chunk = cfg.cfg.getint('data', 'n_max_chunk', fallback=-1)
         
     ## analyze independent channels
     for i, f in enumerate(data):
@@ -268,7 +269,7 @@ def analyze(data, acc):
         # to avoid a too big file loaded in RAM, split the reading in parts
         # and accumulate the results in acc
         #d = read_data(f, max_samples)
-        h = DataReader(f, max_samples)
+        h = DataReader(f, max_samples, n_max_chunk)
         for d in h:
             cfg.params.sampling_freq = h.sampling_freq
             duration = len(d) / 3.6e3 / cfg.params.sampling_freq
