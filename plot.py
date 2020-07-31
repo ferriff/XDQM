@@ -39,11 +39,13 @@ def gp_set_defaults():
     gp.c('set label 101 "Last updated on ".system("date -u \\"+%a %e %b %Y %R:%S %Z\\"") at screen .975, graph 1 rotate by 90 right font ",12" tc "#999999"')
     gp.c('hour(x) = x / 1000. / 3600.')
     gp.c('odir = "' + cfg.global_odir + '/"')
+    if cfg.tmpdir == '':
+        cfg.tmpdir = tempfile.mkdtemp(prefix='tmp_out_', dir='.')
 
 
 
 def plot_amplitude(maxima, suffix, det):
-    dummy, fname = tempfile.mkstemp(prefix='tmp_amplitude_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_amplitude_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
     xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
@@ -67,7 +69,7 @@ def plot_amplitude(maxima, suffix, det):
 def plot_peaks(peaks, peaks_max, suffix, det):
     if len(peaks) == 0:
         return
-    dummy, fname = tempfile.mkstemp(prefix='tmp_peaks_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_peaks_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'peaks%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -91,7 +93,7 @@ def plot_peaks(peaks, peaks_max, suffix, det):
 def plot_baseline(base, base_min, suffix, det):
     if len(base) == 0:
         return
-    dummy, fname = tempfile.mkstemp(prefix='tmp_baseline_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_baseline_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'baseline%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -115,7 +117,7 @@ def plot_baseline(base, base_min, suffix, det):
 
 
 def plot_pulse_shapes(shapes, suffix, det):
-    dummy, fname = tempfile.mkstemp(prefix='tmp_shapes_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_shapes_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'shapes%s' % suffix), exist_ok=True)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'normalized_shapes%s' % suffix), exist_ok=True)
@@ -145,7 +147,7 @@ def plot_pulse_shapes(shapes, suffix, det):
 
 
 def plot_rate(rate, window, suffix, det):
-    dummy, fname = tempfile.mkstemp(prefix='tmp_rate_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_rate_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'rate%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -164,7 +166,7 @@ def plot_rate(rate, window, suffix, det):
 
 
 def plot_fft_rate(freq, power, suffix, det):
-    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_rate_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_rate_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'fft_rate%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -184,7 +186,7 @@ def plot_fft_rate(freq, power, suffix, det):
 
 
 def plot_fft_data(freq, power, suffix, det):
-    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_data_', suffix='.dat', dir='.', text=True)
+    dummy, fname = tempfile.mkstemp(prefix='tmp_fft_data_', suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, 'fft_data%s' % suffix), exist_ok=True)
     gp_set_defaults()
@@ -196,7 +198,7 @@ def plot_fft_data(freq, power, suffix, det):
     gp.c('set log x')
     gp.c('set mxtics 10')
     gp.c('set ylabel "Power Spectral Density (V^2 / Hz)"')
-    #gp.c('set format y "%L"')
+    gp.c('set format y "10^{%L}"')
     gp.c('set xlabel "Frequency (Hz)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
