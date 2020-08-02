@@ -4,13 +4,19 @@ import os
 import numpy as np
 import PyGnuplot as gp
 import tempfile
+import time
 
 fn_collector = []
 
 def clean_tmpfiles():
+    print('Waiting 5 sec to clean temporary files and directories...')
+    time.sleep(5)
     for fn in fn_collector:
         if os.path.isfile(fn):
             os.remove(fn)
+    if os.path.isdir(cfg.tmpdir):
+        os.rmdir(cfg.tmpdir)
+    print('temporary files and directories cleaned.')
 
 def detector_name(det):
     return cfg.cfg['setup']['ch%03d' % det].replace(' ', '_') # FIXME: better sanitize dir names
