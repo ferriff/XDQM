@@ -270,6 +270,7 @@ def analyze(data, acc):
         # and accumulate the results in acc
         #d = read_data(f, max_samples)
         h = DataReader(f, max_samples, n_max_chunk)
+        n_samples_read = 0
         for d in h:
             cfg.params.sampling_freq = h.sampling_freq
             duration = len(d) / 3.6e3 / cfg.params.sampling_freq
@@ -279,6 +280,7 @@ def analyze(data, acc):
                 continue
             ###print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
             print("Progress: %.1f%%" % (h.progress()*100.))
+            print("Chunk size:", h.last_chunk_size)
             d = volt(d)
             suff = '_det%03d' % i
             det = i + 1
@@ -296,7 +298,8 @@ def analyze(data, acc):
                 peaks, peaks_max = filt_ana.find_peaks_2(d, [lfreq[i], hfreq[i]], cfg.params.sampling_freq, win[i], thr[i])
             else:
                 peaks, peaks_max = find_peaks(d * 1., fir)
-                
+
+            peaks = list(np.add(peaks, n_samples_read))
             acc.add(det, 'peak', (peaks, peaks_max))
 
             # store peak positions and amplitudes for 
@@ -305,6 +308,7 @@ def analyze(data, acc):
 
             # baseline vs time
             base, base_min = baseline(d * 1., 10000)
+            base = list(np.add(base, n_samples_read))
             acc.add(det, 'baseline', (base, base_min))
 
             ## normalized pulse shape
@@ -326,3 +330,5 @@ def analyze(data, acc):
             #from scipy import signal
             #f, Pxx_den = signal.periodogram(p[:10000], 1)
             #plot_fft_rate(f, Pxx_den, suff)
+
+            n_samples_read += h.last_chunk_size
