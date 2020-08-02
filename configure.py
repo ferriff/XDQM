@@ -39,3 +39,6 @@ def init():
     global ampl_reco_weights
     #ampl_reco_weights = pickle.load(open('amplitude_reco_weights.pkl', 'rb'))
     ampl_reco_weights = pickle.load(open('pulse_weights.pkl', 'rb'))
+
+    global tmpdir
+    tmpdir = ""
