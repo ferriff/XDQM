@@ -97,6 +97,7 @@ with suffix data_suff.'''
         ana.analyze(data, acc)
         # plot the run every chunk
         acc.plot()
+        acc.dump(os.path.join(cfg.global_odir, 'output.pkl'))
         acc.clear()
         analyzed[k] = True
         # dump updated list of analyzed runs
