@@ -9,8 +9,8 @@ import time
 fn_collector = []
 
 def clean_tmpfiles():
-    print('Waiting 5 sec to clean temporary files and directories...')
-    time.sleep(5)
+    print('Waiting 10 sec to clean temporary files and directories...')
+    time.sleep(10)
     for fn in fn_collector:
         if os.path.isfile(fn):
             os.remove(fn)
@@ -69,6 +69,7 @@ def plot_amplitude(maxima, suffix, det):
         gp.c('plot [][] "'+fname+'" u 1:2 not w histep lt 6')
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -93,6 +94,7 @@ def plot_peaks(peaks, peaks_max, suffix, det):
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w imp lt 6")
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -119,6 +121,7 @@ def plot_baseline(base, base_min, suffix, det):
         gp.c('plot "'+fname+'"'+" u (hour($1)):($2) axis x1y2 not w l lc '#bcbcbc', '' u (hour($1)):($2) not w l lt 6")
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -149,6 +152,7 @@ def plot_pulse_shapes(shapes, suffix, det):
         gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -168,6 +172,7 @@ def plot_rate(rate, window, suffix, det):
         gp.c('plot [][] "'+fname+'" u ($0 / 3600.):($1/'+str(window)+') not w l lt 6')
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -188,6 +193,7 @@ def plot_fft_rate(freq, power, suffix, det):
         gp.c('plot [][] "'+fname+'" u ($1 * 60):2 not w l lt 6')
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
 
 
 
@@ -212,3 +218,29 @@ def plot_fft_data(freq, power, suffix, det):
         gp.c('plot [1:][] "'+fname+'" u 1:2 not w l lt 6')
         gp.c('set out')
     fn_collector.append(fname)
+    os.close(dummy)
+
+
+
+def plot_correlations(peaks_a, peaks_max_a, det_a, peaks_b, peaks_max_b, det_b, suffix):
+    if len(peaks_a) == 0:
+        return
+    dummy, fname = tempfile.mkstemp(prefix='tmp_corr_peaks', suffix='.dat', dir=cfg.tmpdir, text=True)
+    det_name = detector_name(det_a)
+    os.makedirs(os.path.join(cfg.global_odir, det_name, 'corr_peaks%s' % suffix), exist_ok=True)
+    gp_set_defaults()
+    gp.s([peaks_max_a, peaks_max_b], filename=fname)
+    gp.c('set auto fix')
+    gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
+    gp.c('set ylabel "Amplitude (V) - Detector %d"' % det_a)
+    gp.c('set xlabel "Amplitude (V) - Detector %d"' % det_b)
+    #pmin = np.quantile(peaks_max_a, 0.025, axis = 0)
+    #pmax = np.quantile(peaks_max_, 0.975, axis = 0)
+    #gp.c('set yrange [%f:%f]' % (pmin, pmax))
+    for ext in cfg.cfg['plot']['output_format'].split():
+        gp_set_terminal(ext)
+        gp.c('set out odir."%s/corr_peaks%s/corr_peaks%s.%s"' % (det_name, suffix, suffix, ext))
+        gp.c('plot "'+fname+'"'+" u ($1):($2) not w p pt 1 lt 6")
+        gp.c('set out')
+    fn_collector.append(fname)
+    os.close(dummy)
