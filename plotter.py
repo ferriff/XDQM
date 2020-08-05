@@ -93,7 +93,7 @@ with suffix data_suff.'''
             print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
             data.append(f)
             #print('done')
-        print("Analyzing: " + ", ".join(data))
+        print("Analyzing:\n--> " + "\n--> ".join(data))
         ana.analyze(data, acc)
         # plot the run every chunk
         acc.plot()
