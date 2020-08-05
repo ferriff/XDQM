@@ -229,6 +229,48 @@ def compute_rate(peaks, peaks_max, window=1000):
 
 
 
+from bisect import bisect_left
+
+def find_correlation_window(det_a, peaks_a, det_b, peaks_b):
+    of = open('correlations.dat', 'a+')
+    for a in peaks_a:
+        i = bisect.bisect_left(peaks_b, a)
+        #print('--> corr', det_a, det_b, a, peaks_b[i-1] - a, peaks_b[i] - a, peaks_b[i+1] - a)
+        of.write('%d %d %d %d\n' % (det_a, det_b, a, peaks_b[i] - a))
+    of.write('\n\n')
+    of.close()
+
+
+def closest_position(value_list, x):
+    """Return the position of the value in `value_list' closest to `x'. Assumes value_list is sorted."""
+    i = bisect_left(value_list, x)
+    if i == len(value_list):
+        return i - 1
+    if value_list[i] - x < x - value_list[i - 1]:
+        return i
+    else:
+        return i - 1
+
+
+def compute_correlations(peaks_a, peaks_max_a, peaks_b, peaks_max_b, window=200):
+    """For each peak in `peaks_a', find the closest peak in `peaks_b' and store both peaks if their distance is less than `window' samples. Assumes the `peaks_a,b' are sorted. Return the list of peak positions and peak amplitudes."""
+    a, am, b, bm = [], [], [], []
+    if len(peaks_a) == 0 or len(peaks_b) == 0:
+        return a, am, b, bm
+    pa, pam, pb, pbm = peaks_a, peaks_max_a, peaks_b, peaks_max_b
+    l_pa = len(pa)
+    for i in range(l_pa):
+        j = closest_position(pb, pa[i])
+        if abs(pa[i] - pb[j]) < window:
+            a.append(pa[i])
+            am.append(pam[i])
+            b.append(pb[j])
+            bm.append(pbm[j])
+
+    return a, am, b, bm
+
+
+
 def analyze(data, acc):
     """Analyze the data in `data' and store quantities in the accumulator `acc'"""
 
@@ -280,7 +322,6 @@ def analyze(data, acc):
                 continue
             ###print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
             print("Progress: %.1f%%" % (h.progress()*100.))
-            print("Chunk size:", h.last_chunk_size)
             d = volt(d)
             suff = '_det%03d' % i
             det = i + 1
@@ -300,6 +341,7 @@ def analyze(data, acc):
                 peaks, peaks_max = find_peaks(d * 1., fir)
 
             peaks = list(np.add(peaks, n_samples_read))
+            #print(peaks[:10], '...', peaks[-10:])
             acc.add(det, 'peak', (peaks, peaks_max))
 
             # store peak positions and amplitudes for 
@@ -331,4 +373,6 @@ def analyze(data, acc):
             #f, Pxx_den = signal.periodogram(p[:10000], 1)
             #plot_fft_rate(f, Pxx_den, suff)
 
+            acc.add_analyzed_samples(det, h.last_chunk_size)
             n_samples_read += h.last_chunk_size
+            #print('-->', h.last_chunk_size, n_samples_read)
