@@ -5,11 +5,10 @@
 <title>Cross/Cupid Data Quality Monitoring</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <link rel="Help" href="/Help/" />
-<link rel="stylesheet" href="/css/dqm.css" type="text/css" media="all" />
-</style>
+<link rel="stylesheet" href="/css/dqm.css$css_version" type="text/css" media="all" />
 <meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"
 </head>
-<body>
+<body style="display:none;">
   <div class="header">
     <h1>Cross/Cupid Data Quality Monitoring</h1>
   </div>
@@ -30,6 +29,5 @@
   </div></div>
   <div class="footer">
     Designed by Ph. Gras &amp; F. Ferri. CEA/IRFU
-  </div>
-  
+  </div>  
 </body>

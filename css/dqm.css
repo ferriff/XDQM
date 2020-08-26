@@ -16,10 +16,6 @@
     
 }
 
-body{
-    margin: 0 0 0 0;
-}
-
 .header{
     top: 0;
     text-align: center;
@@ -180,4 +176,9 @@ a:active {
 
 .welcome-title{
         text-align: center;
+}
+
+body{
+    margin: 0 0 0 0;
+    display:block !important;	
 }
