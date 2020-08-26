@@ -29,11 +29,63 @@ body{
     padding: 10px;
 }
 
-.topnav{
+.topnav {
+    display: flex;
+    align-content: center;
     overflow: hidden;
     background-color: var(--color-5);
     color: white;
     margin: 0 0 0 0;
+}
+
+.path {
+    overflow: hidden;
+    background-color: #BCBCBC;
+    color: var(--color-4);
+    margin: 0 0 0 0;
+    padding: 3px 10px 3px 10px;
+    min-height: 25px;
+}
+
+.path a:link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.run_num_form{
+    float: right;
+    align-self: center;
+}
+
+.run_num_form input#num {
+    text-align: center;
+    background-color: #3696C1;
+    color: white;
+    border: 0px;
+    border-radius: 5px;
+    padding: 4px;
+}
+.top_nav_ruler{
+    flex-grow: 1;
+}
+
+.run_num_label{
+    padding: 14px 12px;
+}
+
+a:visited {
+    color: inherit;
+    text-decoration: none;
+}
+
+a:hover {
+    color: blue;
+    text-decoration: underline;
+}
+
+a:active {
+    color: red;
+    text-decoration: underline;
 }
 
 .topnav a {
@@ -69,6 +121,7 @@ body{
     justify-content: center;
     flex-wrap: wrap;
     padding: 4px;
+    align-items:baseline;
 }
 
 .runlist {

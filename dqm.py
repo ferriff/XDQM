@@ -22,16 +22,19 @@ import urllib.parse as urlparse
 import argparse
 import sys
 import copy
+import html
 
 #Message display verbosity. Default is 1.
 #Controlled with the -q (set to 0) and -v (increase by 1) options
 verb = 1
 
 root_dir = "./"
-plot_dir_live = "store/live"
-plot_dir_runs = "store/runs"
+plot_dir = "store"
+run_subdir = 'runs'
+live_subdir = 'live'
 plot_not_found = "store/plot_not_found.svg"
 web_root = "/"
+run_format = "%06d" #format of run directory names
 
 max_caption_file_size = 1024*1024
 max_static_page_size = 100*1024*1024
@@ -65,7 +68,7 @@ class PageStore(object):
     def register(self, path, func):
         if path == "/" and self._default == self.dummy_gen:
             self._default = func
-        msg(1, 'Registering %s -> %s()' %(path, func))
+        msg(2, 'Registering %s -> %s()' %(path, func))
         self.map[path] = func
 
     def _is_static(self, path):
@@ -179,37 +182,60 @@ def build_page(template_path, values):
         
     return s.substitute(values)
 
-def gen_plot_page(environ, plot_dir):
-    plots = get_plots(plot_dir)
+def gen_plot_page(plot_path):
+    plots = get_plots(os.path.join(plot_dir, plot_path))
     figures = ""
     for p in plots:
         figures += build_page("templates/figure.thtml", p)
 
-    home = build_page("templates/main.thtml", { "content": figures, "content_class": "flexcontent"})
+    return gen_page(content=figures, path=plot_path)
 
-    return "text/html", home
+def gen_page(content = "&nbsp", content_class="flexcontent", path=""):
+    run_num = path_to_run_num(path)
+    if run_num:
+        run_num = run_format % run_num
+    else:
+        run_num = ""
+    return "text/html", build_page("templates/main.thtml", {"content": content, "content_class": content_class,
+                                                            "path": html_path(path),
+                                                            "run_subdir": run_subdir,
+                                                            "live_subdir": live_subdir,
+                                                            "run_num": run_num})
+
 
 def gen_home(environ):
-    return "text/html", build_page("templates/main.thtml", {"content": "&nbsp;", "content_class": "flexcontent"})
+    s = open("templates/welcome_home.html").read()
+    return gen_page(content=s)
 
 store.register("/", gen_home)
 
-def gen_live(environ):
-    return gen_plot_page(environ, plot_dir_live)
 
-store.register("/live", gen_live)
+#def gen_live(environ):
+#    return gen_navigation(environ, is_live=True)
+
+#store.register("/live", gen_live)
 
 def gen_run(environ):
     params = urlparse.parse_qs(environ['QUERY_STRING'])
     if not params:
-        return gen_live(environ)
+        return gen_navigation_(run_subdir)
     try:
         run_num = params["num"][0]
     except KeyError:
         msg(2, "Page run requested without passing a run number")
         return gen_live(environ)
-    
-    return gen_plot_page(environ, os.path.join(plot_dir_runs, run_num))
+
+    try:
+        run_num = int(run_num)
+    except ValueError:
+        run_num = 0
+
+    plot_path = plot_path_of_run(run_num)
+
+    if not plot_path:
+        plot_path = run_subdir
+        
+    return gen_navigation_(plot_path)
 
 store.register("/run", gen_run)
 
@@ -239,14 +265,20 @@ def get_run_list():
         yield x
 
 
-def gen_runs(environ):
-    run_list = ""
-    for r in get_run_list():
-        run_list += build_page("templates/run.thtml", {"link": "run?num=%s" % r, "run_num": r})
+   
 
-    return "text/html", build_page("templates/main.thtml", {"content": run_list, "content_class": "runlist"})
+def path_to_run_num(plot_path):
+    elts = plot_path.split(os.path.sep)
+    for e in elts:
+        try:
+            run_num = int(e)
+        except:
+            continue
+        
+        if run_format % run_num == e:
+            return run_num
 
-#store.register("/runs", gen_runs)
+    return None
 
 def get_dir_list(path):
     d = []
@@ -265,17 +297,11 @@ def get_dir_list(path):
     for x in d:
         yield x
 
-def gen_plot_page_simple(environ):
-    path = environ.get('PATH_INFO')
-    ppath = os.path.join('store/', path.lstrip('/'))
-    return gen_plot_page(environ, ppath)
-
 def is_plot_dir(path):
     name = os.path.basename(path)
     return len(glob.glob(os.path.join(path, name + '.*'))) > 0
 
 def gen_navigation(environ):
-
     params = urlparse.parse_qs(environ['QUERY_STRING'])
     plot_path = ""
     if params:
@@ -285,21 +311,55 @@ def gen_navigation(environ):
             msg(2, "Page run requested without passing a path")
             pass
 
+    return gen_navigation_(plot_path)
+
+def gen_navigation_(plot_path):
     dir_list = ""
     
-    for r in get_dir_list(os.path.join(plot_dir_runs, plot_path.lstrip('/'))):
+    for r in get_dir_list(os.path.join(plot_dir, plot_path.lstrip('/'))):
         new_path = os.path.join(plot_path, r)
-        if is_plot_dir(os.path.join(plot_dir_runs, new_path)):
-            return gen_plot_page(environ, os.path.join(plot_dir_runs, plot_path))
-        params['path'] = new_path
-        dir_list += build_page("templates/run.thtml", {"link": "nav?path=%s" % new_path, "run_num": r})
+        if is_plot_dir(os.path.join(plot_dir, new_path)):
+            return gen_plot_page(plot_path)
+        else:
+            dir_list += build_page("templates/run.thtml", {"link": "nav?path=%s" % urlparse.quote(new_path), "run_num": r})
 
-    return "text/html", build_page("templates/main.thtml", {"content": dir_list, "content_class": "runlist"})
-
+    return gen_page(content=dir_list, content_class="runlist", path=plot_path)
+    
 store.register("/nav", gen_navigation)
-store.register("/runs", gen_navigation)
+#store.register("/runs", gen_navigation)
 
+def resubs(string, substitutions):
+    '''Apply a list of regex substitions. The substitutions argument must a be a list of pairs (pattern, to_sustitute).'''
+    new_str = string
+    for s in substitutions:
+        new_str = re.sub(s[0], s[1], new_str)
+    return new_str
 
+def html_path(path):
+    '''Encode plot navigation PATH in html and includes links.'''
+    dirs = path.split('/')
+    result = ""
+    path = ""
+    sep = ""
+    for d in dirs:
+        path = os.path.join(path, d)
+        result += sep + '<a href="nav?path=%s">%s</a>' % (urlparse.quote(path), html.escape(d))
+        sep = "&nbsp;&gt; "
+        
+    return result
+
+def plot_path_of_run(run_num):
+    try:
+        run_num = int(run_num)
+    except ValueError:
+        run_num = 0
+        
+    run_label = run_format % run_num
+    
+    #Returns first found directory:
+    for i in glob.iglob(os.path.join(plot_dir, run_subdir, '**', run_label, ''), recursive=True):
+        return os.path.relpath(os.path.abspath(i), start = os.path.abspath(plot_dir))
+    return None
 
 def application (environ, start_response):
 ##    # Returns a dictionary in which the values are lists

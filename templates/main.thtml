@@ -15,12 +15,19 @@
   </div>
   <div class="topnav">
     <a href="/">Home</a>
-    <a href="/live">Live</a>
-    <a href="/runs">Runs</a>
+    <a href="/nav?path=$live_subdir">Live</a>
+    <a href="/nav?path=$run_subdir">Runs</a>
+    <div class="top_nav_ruler"></div>
+    <form action="/run" class="run_num_form">
+      Run&nbsp;<input type="text" id="num" maxlength="6" size="6" name="num" value="$run_num"><input style="visibility: hidden" type="submit" value="">
+    </form>
   </div>
-  <div class="content $content_class">
+  <div class="path">
+    $path 
+  </div>
+  <div class="content"> <div class="$content_class">
     $content
-  </div>
+  </div></div>
   <div class="footer">
     Designed by Ph. Gras &amp; F. Ferri. CEA/IRFU
   </div>
