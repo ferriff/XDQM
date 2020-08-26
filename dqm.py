@@ -2,7 +2,7 @@
 
 #Python 2 and 3 compatibility
 #Ref.: https://python-future.org/compatible_idioms.html
-from __future__ import print_function 
+from __future__ import print_function
 from future.standard_library import install_aliases
 install_aliases()
 
@@ -11,6 +11,7 @@ install_aliases()
 #from wsgiref.simple_server import make_server
 from gevent.pywsgi import WSGIServer
 from cgi import parse_qs, escape
+from email.utils import formatdate
 
 import string
 import glob
@@ -23,6 +24,7 @@ import argparse
 import sys
 import copy
 import html
+import time
 
 #Message display verbosity. Default is 1.
 #Controlled with the -q (set to 0) and -v (increase by 1) options
@@ -35,13 +37,14 @@ live_subdir = 'live'
 plot_not_found = "store/plot_not_found.svg"
 web_root = "/"
 run_format = "%06d" #format of run directory names
+css_file = root_dir + 'css/dqm.css'
 
 max_caption_file_size = 1024*1024
 max_static_page_size = 100*1024*1024
 
-def natural_sort(l): 
-    convert = lambda text: int(text) if text.isdigit() else text.lower() 
-    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+def natural_sort(l):
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
     return sorted(l, key = alphanum_key)
 
 def msg(level, *args):
@@ -52,7 +55,7 @@ class PageStore(object):
     @staticmethod
     def dummy_gen(environ):
         return ("text", "")
-    
+
     def __init__(self):
         self.map = {}
         self.mimetypes = { ".css": "text/css", ".html": "text/html", ".htm": "text/html",  ".svg": "image/svg+xml", ".svgz": "image/svg+xml", "sgv.gz": "image/svg+xml" }
@@ -64,7 +67,7 @@ class PageStore(object):
 
     def set_default(self, func):
         self.default = func
-        
+
     def register(self, path, func):
         if path == "/" and self._default == self.dummy_gen:
             self._default = func
@@ -83,7 +86,7 @@ class PageStore(object):
             return False
         else:
             return True
-        
+
     def _gen_static(self, path):
         if not self.is_path_allowed(path):
             return ""
@@ -94,7 +97,7 @@ class PageStore(object):
             e = sys.exc_info()[0]
             msg(1, "Failed to read file %s%s: %s" % (root_dir, path, e.msg))
             return ""
-        
+
     def gen_page(self, environ):
         path = environ.get('PATH_INFO')
         msg(2, "Page %s requested" % path)
@@ -103,7 +106,7 @@ class PageStore(object):
             mimetype = self._get_mimetypes(path)
             if not mimetype:
                 msg(1, "Extension of file %s is not supported." % path)
-                return self._default(environ)                
+                return self._default(environ)
             else:
                 msg(3, "Serving static page %s as %s type." % (path, mimetype) )
                 return mimetype, self._gen_static(path)
@@ -118,7 +121,7 @@ class PageStore(object):
 
         if isinstance(page[1], str):
             page[1] = page[1].encode('utf-8')
-        
+
         return page
 
 store = PageStore()
@@ -144,7 +147,13 @@ def get_plots(plot_dir):
         base = "%s/%s"  % (p, name)
         hres_img_path = _look_for_img(base, hres_exts)
         lres_img_path = _look_for_img(base, lres_exts)
-            
+
+        if lres_img_path:
+            lres_img_path = add_rev(lres_img_path)
+
+        if hres_img_path:
+            hres_img_path = add_rev(hres_img_path)
+
         if lres_img_path and not hres_img_path:
             msg(1, "Missing high-resolution image")
             lres_img_path = hres_img_path
@@ -152,7 +161,7 @@ def get_plots(plot_dir):
         if hres_img_path and not lres_img_path:
             msg(1, "Missing low-resolution image")
             hres_img_path = lres_img_path
-                        
+
         if not lres_img_path:
             msg(1, "No image file %s/%s.xxx found. Supported extension: %s" % (p, name, " ".join(all_exts)))
             if os.path.isfile(plot_not_found):
@@ -160,7 +169,7 @@ def get_plots(plot_dir):
                 hres_img_path = plot_not_found
             else:
                 continue
-        
+
         caption_file = "%s/%s.cap" % (p, name)
         try:
             with open(caption_file) as f:
@@ -171,16 +180,26 @@ def get_plots(plot_dir):
         caption_label = "Plot %d" % i
         img_alt = caption_label
         yield {"lres_img_path": lres_img_path, "hres_img_path": hres_img_path, "img_alt": img_alt, "caption_label": caption_label, "caption_text": caption_text }
-        
+
     if i == 0:
         msg(1, "No plot found under directory %s" % plot_dir)
 
-        
+
+def add_rev(file_path):
+    try:
+        ts = int(os.stat(file_path).st_mtime)
+        file_path += "!%d" % ts
+    except Exception as e:
+        print("Failed to add revision tag to file %s\n%s" % (file_path, str(e)))
+
+    return file_path
+
+
 def build_page(template_path, values):
     with open(template_path) as f:
         s = string.Template(f.read())
-        
-    return s.substitute(values)
+
+    return s.safe_substitute(values)
 
 def gen_plot_page(plot_path):
     plots = get_plots(os.path.join(plot_dir, plot_path))
@@ -191,6 +210,13 @@ def gen_plot_page(plot_path):
     return gen_page(content=figures, path=plot_path)
 
 def gen_page(content = "&nbsp", content_class="flexcontent", path=""):
+    try:
+        css_ts = int(os.stat(css_file).st_mtime)
+        css_version = "!%d" % css_ts
+    except Exception as e:
+        print(e)
+        css_version = ""
+
     run_num = path_to_run_num(path)
     if run_num:
         run_num = run_format % run_num
@@ -200,7 +226,8 @@ def gen_page(content = "&nbsp", content_class="flexcontent", path=""):
                                                             "path": html_path(path),
                                                             "run_subdir": run_subdir,
                                                             "live_subdir": live_subdir,
-                                                            "run_num": run_num})
+                                                            "run_num": run_num,
+                                                            "css_version": css_version})
 
 
 def gen_home(environ):
@@ -234,7 +261,7 @@ def gen_run(environ):
 
     if not plot_path:
         plot_path = run_subdir
-        
+
     return gen_navigation_(plot_path)
 
 store.register("/run", gen_run)
@@ -265,7 +292,7 @@ def get_run_list():
         yield x
 
 
-   
+
 
 def path_to_run_num(plot_path):
     elts = plot_path.split(os.path.sep)
@@ -274,7 +301,7 @@ def path_to_run_num(plot_path):
             run_num = int(e)
         except:
             continue
-        
+
         if run_format % run_num == e:
             return run_num
 
@@ -315,7 +342,7 @@ def gen_navigation(environ):
 
 def gen_navigation_(plot_path):
     dir_list = ""
-    
+
     for r in get_dir_list(os.path.join(plot_dir, plot_path.lstrip('/'))):
         new_path = os.path.join(plot_path, r)
         if is_plot_dir(os.path.join(plot_dir, new_path)):
@@ -324,7 +351,7 @@ def gen_navigation_(plot_path):
             dir_list += build_page("templates/run.thtml", {"link": "nav?path=%s" % urlparse.quote(new_path), "run_num": r})
 
     return gen_page(content=dir_list, content_class="runlist", path=plot_path)
-    
+
 store.register("/nav", gen_navigation)
 #store.register("/runs", gen_navigation)
 
@@ -345,7 +372,7 @@ def html_path(path):
         path = os.path.join(path, d)
         result += sep + '<a href="nav?path=%s">%s</a>' % (urlparse.quote(path), html.escape(d))
         sep = "&nbsp;&gt; "
-        
+
     return result
 
 def plot_path_of_run(run_num):
@@ -353,9 +380,9 @@ def plot_path_of_run(run_num):
         run_num = int(run_num)
     except ValueError:
         run_num = 0
-        
+
     run_label = run_format % run_num
-    
+
     #Returns first found directory:
     for i in glob.iglob(os.path.join(plot_dir, run_subdir, '**', run_label, ''), recursive=True):
         return os.path.relpath(os.path.abspath(i), start = os.path.abspath(plot_dir))
@@ -382,6 +409,19 @@ def application (environ, start_response):
 ##    }
 ##
 
+
+    path = environ.get('PATH_INFO')
+
+    elts = path.rsplit('!', 1)
+
+    if len(elts) > 1:
+        revision = elts[1]
+    else:
+        revision = None
+
+    #Drop revision number from page path for further processing
+    environ['PATH_INFO'] = elts[0]
+
     mime_type, response_body = store.gen_page(environ)
 
     status = '200 OK'
@@ -395,11 +435,14 @@ def application (environ, start_response):
     if mime_type[1]:
         response_headers.append(('Content-Encoding', mime_type[1]))
 
+    #Enable browser cache If requested content supports revision
+    if revision:
+        one_month = 3600.*24.*30.
+        expire_date = time.time() + one_month
+        response_headers.append(('Expires', formatdate(expire_date, localtime=False, usegmt=True)))
+
     start_response(status, response_headers)
     return [response_body]
-
-    
-    
 
 if __name__ == "__main__":
 
@@ -416,10 +459,10 @@ if __name__ == "__main__":
 
     http_server = WSGIServer((opt.host, opt.port), application)
     http_server.serve_forever()
-    
+
     msg(1, "Listening to http://%s:%d" % (opt.host, opt.port))
 
 #    webbrowser.open("http://localhost:8051")
-    
+
     # Now it is serve_forever() in instead of handle_request()
     httpd.serve_forever()

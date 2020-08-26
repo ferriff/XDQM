@@ -16,10 +16,6 @@
     
 }
 
-body{
-    margin: 0 0 0 0;
-}
-
 .header{
     top: 0;
     text-align: center;
@@ -167,4 +163,10 @@ a:active {
 .run_number > a {
     color: white;
     text-align: right;
+}
+
+
+body{
+    margin: 0 0 0 0;
+    display:block !important;	
 }
