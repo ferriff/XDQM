@@ -144,11 +144,11 @@ def get_plots(plot_dir):
             
         if lres_img_path and not hres_img_path:
             msg(1, "Missing high-resolution image")
-            lres_img_path = hres_img_path
+            hres_img_path = lres_img_path
 
         if hres_img_path and not lres_img_path:
             msg(1, "Missing low-resolution image")
-            hres_img_path = lres_img_path
+            lres_img_path = hres_img_path
                         
         if not lres_img_path:
             msg(1, "No image file %s/%s.xxx found. Supported extension: %s" % (p, name, " ".join(all_exts)))
@@ -190,7 +190,8 @@ def gen_plot_page(environ, plot_dir):
     return "text/html", home
 
 def gen_home(environ):
-    return "text/html", build_page("templates/main.thtml", {"content": "&nbsp;", "content_class": "flexcontent"})
+    s = open("templates/welcome_home.html").read()
+    return "text/html", build_page("templates/main.thtml", {"content": s, "content_class": "flexcontent"})
 
 store.register("/", gen_home)
 

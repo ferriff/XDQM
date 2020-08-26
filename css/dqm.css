@@ -115,3 +115,16 @@ body{
     color: white;
     text-align: right;
 }
+
+.welcome{
+    background-color: var(--color-5);
+    padding: 15px;
+}
+.welcome-link{
+        text-decoration: underline;
+        color: #ffffff;
+}
+
+.welcome-title{
+        text-align: center;
+}
