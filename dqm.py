@@ -80,15 +80,24 @@ class PageStore(object):
         else:
             return False
 
-    def is_path_allowed(self, path):
-        if os.path.commonprefix((root_dir + os.path.realpath(path), root_dir)) != root_dir:
+    def is_path_allowed(path):
+        abs_root_dir = os.path.realpath(root_dir)
+        path = os.path.realpath(path)
+
+        if os.path.commonprefix((path, abs_root_dir)) != abs_root_dir:
             msg(1, "Request to access unsafe path %s rejected." % path)
             return False
-        else:
-            return True
+
+        #Extra check, redundant with previous one, for safety:
+        if ".." in path.split(os.path.sep):
+            msg(1, "Bug Request to access unsafe path %s rejected." % path)
+            return False
+
+        return True
 
     def _gen_static(self, path):
-        if not self.is_path_allowed(path):
+        abspath = os.path.realpath(os.path.join(root_dir,path))
+        if not PageStore.is_path_allowed(path):
             return ""
         try:
             with open(root_dir + path, 'rb') as f:
@@ -343,7 +352,18 @@ def gen_navigation(environ):
 def gen_navigation_(plot_path):
     dir_list = ""
 
-    for r in get_dir_list(os.path.join(plot_dir, plot_path.lstrip('/'))):
+    if ".." in plot_path.split(os.path.sep):
+        msg(0, 'Ignoring navigation request with a path parameter containing "..".')
+        return gen_page()
+
+    charset = '[a-zA-Z0-9.-_/]'
+    if not re.match('^' + charset + '$', plot_path):
+        msg(0, 'Ignoring navigation request to path %s that contains other character(s) than from the %s set.' % (plot_path, charset))
+        return gen_page()
+    
+    d = os.path.join(plot_dir, plot_path.lstrip('/'))
+    
+    for r in get_dir_list(d):
         new_path = os.path.join(plot_path, r)
         if is_plot_dir(os.path.join(plot_dir, new_path)):
             return gen_plot_page(plot_path)

@@ -48,19 +48,18 @@
     text-decoration: none;
 }
 
+.path a:visited {
+    color: inherit;
+}
+
 .path a:hover {
-    color: var(--color-5);
-    text-decoration: underline;
+    color: var(--color-5) !important;
+    text-decoration: underline !important;
 }
 
 .path a:active {
-    color: red;
-    text-decoration: underline;
-}
-
-.path a:visited {
-    color: inherit;
-    text-decoration: none;
+    color: #920606 !important;
+    text-decoration: underline !important;
 }
 
 .run_num_form{
