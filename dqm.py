@@ -96,11 +96,12 @@ class PageStore(object):
         return True
 
     def _gen_static(self, path):
-        abspath = os.path.realpath(os.path.join(root_dir,path))
-        if not PageStore.is_path_allowed(path):
+        abspath = os.path.realpath(os.path.join(root_dir, path.lstrip('/')))
+        if not PageStore.is_path_allowed(abspath):
+            msg(1, "Ignoring request for file %s" % abspath)
             return ""
         try:
-            with open(root_dir + path, 'rb') as f:
+            with open(abspath, 'rb') as f:
                 return f.read(max_static_page_size)
         except:
             e = sys.exc_info()[0]
@@ -124,7 +125,7 @@ class PageStore(object):
         try:
             func = self.map[path]
         except KeyError:
-            pass
+            return None
 
         page = list(func(environ))
 
@@ -231,13 +232,16 @@ def gen_page(content = "&nbsp", content_class="flexcontent", path=""):
         run_num = run_format % run_num
     else:
         run_num = ""
-    return "text/html", build_page("templates/main.thtml", {"content": content, "content_class": content_class,
-                                                            "path": html_path(path),
-                                                            "run_subdir": run_subdir,
-                                                            "live_subdir": live_subdir,
-                                                            "run_num": run_num,
-                                                            "css_version": css_version})
 
+    content = build_page("templates/main.thtml",
+                         {"content": content, "content_class": content_class,
+                          "path": html_path(path),
+                          "run_subdir": run_subdir,
+                          "live_subdir": live_subdir,
+                          "run_num": run_num,
+                          "css_version": css_version})
+
+    return ("text/html", None), content
 
 def gen_home(environ):
     s = open("templates/welcome_home.html").read()
@@ -356,8 +360,8 @@ def gen_navigation_(plot_path):
         msg(0, 'Ignoring navigation request with a path parameter containing "..".')
         return gen_page()
 
-    charset = '[a-zA-Z0-9.-_/]'
-    if not re.match('^' + charset + '$', plot_path):
+    charset = '[a-zA-Z0-9.\\-_/]'
+    if not re.match('^' + charset + '*$', plot_path):
         msg(0, 'Ignoring navigation request to path %s that contains other character(s) than from the %s set.' % (plot_path, charset))
         return gen_page()
     
@@ -442,7 +446,13 @@ def application (environ, start_response):
     #Drop revision number from page path for further processing
     environ['PATH_INFO'] = elts[0]
 
-    mime_type, response_body = store.gen_page(environ)
+    resp = store.gen_page(environ)
+
+    if not resp:
+        start_response('404 Not Found', [('Content-Type', 'text/html')])
+        return [b'<h1>Not Found</h1>']
+
+    mime_type, response_body = resp
 
     status = '200 OK'
 
