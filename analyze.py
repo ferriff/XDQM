@@ -60,7 +60,7 @@ def file_info(filename, dump = False, dump_count = 1000):
     s = f.read(4)
     cfg.params.sampling_freq = struct.unpack('f', s)[0]
     # data stream of 32 bits: data << 8 + flags
-    print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, sampling_freq))
+    print('# Header --- endiannes: %s  nbits: %d  sampling_frequency: %f' % (endianness, nbits, cfg.params.sampling_freq))
     # dump the first dump_count samples of the file
     if dump:
         d = np.fromfile(f, dtype=np.dtype(np.uint32), count = dump_count)
@@ -138,6 +138,22 @@ def baseline(stream, window):
         baseline_min.append(v)
         i = i + window
     return baseline, baseline_min
+
+
+
+@jit(cache=True, nopython=True)
+def remove_signals(stream, threshold, window):
+    '''Remove signals by removing <window> from <stream> if one sample is greater than <threshold>'''
+    res = []
+    i = 0
+    sL =  len(stream) - window
+    while i < sL:
+        m = np.min(stream[i:i + window])
+        M = np.max(stream[i:i + window])
+        if m < threshold:
+            res.extend(stream[i:i + window])
+        i = i + window
+    return res
 
 
 
@@ -231,8 +247,8 @@ def compute_rate(peaks, peaks_max, window=1000):
 
 from bisect import bisect_left
 
-def find_correlation_window(det_a, peaks_a, det_b, peaks_b):
-    of = open('correlations.dat', 'a+')
+def find_correlation_window_orig(det_a, peaks_a, det_b, peaks_b):
+    of = open('correlations_%03d_%03d.dat' % (det_a, det_b), 'a+')
     for a in peaks_a:
         i = bisect.bisect_left(peaks_b, a)
         #print('--> corr', det_a, det_b, a, peaks_b[i-1] - a, peaks_b[i] - a, peaks_b[i+1] - a)
@@ -244,15 +260,41 @@ def find_correlation_window(det_a, peaks_a, det_b, peaks_b):
 def closest_position(value_list, x):
     """Return the position of the value in `value_list' closest to `x'. Assumes value_list is sorted."""
     i = bisect_left(value_list, x)
+    if i == 0:
+        return i
     if i == len(value_list):
         return i - 1
-    if value_list[i] - x < x - value_list[i - 1]:
+    if abs(value_list[i] - x) < abs(x - value_list[i - 1]):
         return i
     else:
         return i - 1
 
+import time
+def find_correlation_window(peaks_a, peaks_b):
+    deltat = []
+    cnt = 0
+    if len(peaks_b) == 0:
+        return deltat
+    for a in peaks_a:
+        i = closest_position(peaks_b, a)
+        ##if abs(a - peaks_b[i]) > 1e4:
+        ##    print('***>', peaks_a[cnt - 10:cnt + 10])
+        ##    print('***>', peaks_b[i - 10:i + 10])
+        ##    print(a, peaks_b[i], '(%d %d)' % (cnt, i), a - peaks_b[i])
+        ##    time.sleep(0.15)
+        cnt += 1
+        dt = a - peaks_b[i]
+        deltat.append(dt)
+        if dt < 0: # peaks_b[i] arrives after a
+            if i > 0:
+                deltat.append(a - peaks_b[i - 1]) # previous peak
+        else:      # peaks_b[i] arrives before a
+            if i < len(peaks_b) - 1:
+                deltat.append(a - peaks_b[i + 1]) # next peak
+    return deltat
 
-def compute_correlations(peaks_a, peaks_max_a, peaks_b, peaks_max_b, window=200):
+
+def compute_correlations(peaks_a, peaks_max_a, peaks_b, peaks_max_b, window=400):
     """For each peak in `peaks_a', find the closest peak in `peaks_b' and store both peaks if their distance is less than `window' samples. Assumes the `peaks_a,b' are sorted. Return the list of peak positions and peak amplitudes."""
     a, am, b, bm = [], [], [], []
     if len(peaks_a) == 0 or len(peaks_b) == 0:
@@ -295,11 +337,15 @@ def analyze(data, acc):
     thr = []
     hfreq = []
     win = []
+    gain = []
+    noise_threshold = []
     for i in range(len(data)):
-        lfreq.append(cfg.cfg.getfloat('analysis', 'lfreq_ch%03d', fallback=lfreq_default))
-        hfreq.append(cfg.cfg.getfloat('analysis', 'hfreq_ch%03d', fallback=hfreq_default))
-        thr.append(cfg.cfg.getfloat('analysis', 'thr_ch%003d', fallback=thr_default))
-        win.append(cfg.cfg.getfloat('analysis', 'peak_search_window_ch%003d', fallback=win_default))
+        lfreq.append(cfg.cfg.getfloat('analysis', 'filter_lfreq_ch%03d' % (i+1), fallback=lfreq_default))
+        hfreq.append(cfg.cfg.getfloat('analysis', 'filter_hfreq_ch%03d' % (i+1), fallback=hfreq_default))
+        thr.append(cfg.cfg.getfloat('analysis', 'thr_ch%003d' % (i+1), fallback=thr_default))
+        win.append(cfg.cfg.getfloat('analysis', 'peak_search_window_ch%003d' % (i+1), fallback=win_default))
+        gain.append(cfg.cfg.getfloat('setup', 'gain_ch%03d' % (i+1), fallback=1000))
+        noise_threshold.append(cfg.cfg.getfloat('analysis', 'noise_threshold_ch%03d' % (i+1), fallback=2e-6))
 
     max_samples = cfg.cfg.getint('data', 'max_samples_per_file', fallback=-1)
     n_max_chunk = cfg.cfg.getint('data', 'n_max_chunk', fallback=-1)
@@ -322,16 +368,21 @@ def analyze(data, acc):
                 continue
             ###print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
             print("Progress: %.1f%%" % (h.progress()*100.))
-            d = volt(d)
+            d = volt(d) / gain[i]
             suff = '_det%03d' % i
             det = i + 1
+
+            acc.set_sampling_freq(det, h.sampling_freq)
 
             #compute_pulse_weights(d, 200)
 
             #for j, s in enumerate(d):
-            #    if j > 100000:
-            #        break
-            #    print('#', j, s)
+            #    #if j > 500000:
+            #    #    break
+            #    print(i, j, s)
+            #print('\n')
+            #import sys
+            #sys.exit(0)
 
             # amplitude spectrum
             if butterworth:
@@ -357,8 +408,12 @@ def analyze(data, acc):
             #shapes = pulse_shapes(d * 1., peaks, 1000)
             #plot_pulse_shapes(shapes, suff, det)
 
-            # power spectral density
-            f, Pxx_den = signal.welch(d, cfg.params.sampling_freq, nperseg = 25000)
+            ## power spectral density -- all
+            #f, Pxx_den = signal.welch(d, cfg.params.sampling_freq, nperseg = 25000)
+            # power spectral density -- noise only
+            dn = remove_signals(d, noise_threshold[i], 10000)
+            #print(dn[:10], '...', dn[-10:], len(dn), d[:10], '...', d[-10:], len(d))
+            f, Pxx_den = signal.welch(dn, cfg.params.sampling_freq, nperseg = min(25000, int(len(dn) / 2)))
             acc.add(det, 'fft', (f, Pxx_den))
 
             ## rate FFT # FIXME: takes quite a long time
@@ -376,3 +431,6 @@ def analyze(data, acc):
             acc.add_analyzed_samples(det, h.last_chunk_size)
             n_samples_read += h.last_chunk_size
             #print('-->', h.last_chunk_size, n_samples_read)
+
+    #import sys
+    #sys.exit(0)
