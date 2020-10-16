@@ -26,18 +26,19 @@ def peak_finder_window(a, width, thr = 0.):
     peak_vals = []
     peak_pos = []
     i = 1
-    while i < (len(a) - 1):
+    la = len(a)
+    while i < (la - 1):
         if a[i-1] < a[i] and a[i] > a[i+1] and (a[i] > thr):
             j = i
             #peak found, open a window to look for a higher peak
             k = 0
-            while (i + k) < (len(a) - 1) and k < width:
+            while (i + k) < (la - 1) and k < width:
                 if a[i+k] > a[j]:
                     j = i + k
                     
                 k += 1
             #end while
-            
+
             peak_pos.append(j)
             peak_vals.append(a[j])
             i += width
@@ -45,7 +46,7 @@ def peak_finder_window(a, width, thr = 0.):
         i += 1
 
     return peak_pos, peak_vals
-                
+
 #@jit(nopython=True)
 #def peak_finder2(s, thr = 0):
 #    peak_pos = []
