@@ -1,10 +1,11 @@
 #!/usr/bin/env python3.7
 
+import argparse
 import glob
 import os
-import sys
 import pickle
-import argparse
+import shutil
+import sys
 
 from datetime import datetime
 
@@ -26,7 +27,7 @@ def is_data_more_recent_than_plot(plotdir, datainfo):
     return plot_time > data_time
 
 
-def ana_dir(data_root, acc, data_suff = '.bin'):
+def ana_dir(data_root, acc, detect_only=False, data_suff = '.bin'):
     '''Analyses all data found in the directory data_root. It looks for data files
 with suffix data_suff.'''
 
@@ -72,6 +73,23 @@ with suffix data_suff.'''
             # the value is the list of the files in directory corresponding to run and chunk
             drc[tuple([d] + list(rc))] = glob.glob(d + '/' + rc[0] + '_*_' + rc[1] + data_suff)
 
+    if detect_only:
+        analyzed = {}
+        if os.path.isfile(cfg.analyzed_runs):
+            analyzed = pickle.load(open(cfg.analyzed_runs, 'rb'))
+        found = False
+        print('Adding to the run DB:')
+        for k in drc.keys():
+            if k not in analyzed.keys():
+                print('  ', k)
+                analyzed[k] = False
+                found = True
+        if not found:
+            print('no new runs found.')
+        pickle.dump(analyzed, open(cfg.analyzed_runs, 'wb'))
+        sys.exit(0)
+
+
     # ready to analyze runs
     # load list of analyzed runs
     analyzed = {}
@@ -80,25 +98,30 @@ with suffix data_suff.'''
     for k in drc.keys():
         if os.path.isfile(cfg.analyzed_runs):
             analyzed = pickle.load(open(cfg.analyzed_runs, 'rb'))
-        # discard runs with different setup than 12 channels # FIXME: has to be improved        
-        if len(drc[k][:12]) != 12:
+        ### discard runs with different setup than 24 channels # FIXME: has to be improved        
+        if len(drc[k][:24]) != 24:
+            print('Warning: skipping files', drc[k])
             continue
         # skip analyzed runs
         cfg.global_odir = os.path.join(k[0].replace(os.path.dirname(data_root), cfg.plot_out_dir_root), k[1], k[2])
-        if k in analyzed.keys() and not is_data_more_recent_than_plot(cfg.global_odir, drc[k]):
-            continue
+        if k in analyzed.keys():
+            if analyzed[k] == True and not is_data_more_recent_than_plot(cfg.global_odir, drc[k]):
+                continue
         os.makedirs(cfg.global_odir, exist_ok=True)
         data = []
-        for f in drc[k][:12]:
+        for f in drc[k][:24]:
             print(datetime.utcnow().strftime("# %s %Y-%m-%d %H:%M:%S UTC"), ' detected file', f)
             data.append(f)
             #print('done')
-        print("Analyzing:\n--> " + "\n--> ".join(data))
-        ana.analyze(data, acc)
+        print("# Analyzing:\n# --> " + "\n# --> ".join(data))
+        ns = ana.analyze(data, acc)
         # plot the run every chunk
-        acc.plot()
-        acc.dump(os.path.join(cfg.global_odir, 'output.pkl'))
+        if ns:
+            acc.plot()
+            acc.dump(os.path.join(cfg.global_odir, 'output.pkl'))
         acc.clear()
+        # copy cfg file used in the processing
+        shutil.copyfile(cfg.cfg_file, os.path.join(cfg.global_odir, 'process_configuration.cfg'))
         analyzed[k] = True
         # dump updated list of analyzed runs
         pickle.dump(analyzed, open(cfg.analyzed_runs, 'wb'))
@@ -110,19 +133,23 @@ def parse_args():
     parser = argparse.ArgumentParser(description='CROSS DQM: analysis and plotting. Configuration is read from the file configuration.cfg')
     parser.add_argument('--files', 
                         help='Limit the analysis to a list of files. File paths must be provided in the FILES argument as comma separated list.')
+    parser.add_argument('-c', '--cfg', default='configuration.cfg',
+                        help='Configuration file to be used')
+    parser.add_argument('-d', '--detect', action='store_true', default=False,
+                        help='Only finds new files and store them in the run DB with a False (i.e. not processed) flag.')
     
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    cfg.init()
     args = parse_args()
+    cfg.init(args.cfg)
     acc = accumulator.accumulator()
     if args.files:
         cfg.global_odir = "out"
         print("Plots will be stored in the `out' directory.")
         ana.analyze(args.files.split(","), acc)
     else:
-        ana_dir(cfg.data_root, acc)
+        ana_dir(cfg.data_root, acc, detect_only=args.detect)
 
-    plt.clean_tmpfiles()
+    #plt.clean_tmpfiles()
