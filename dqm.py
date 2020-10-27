@@ -8,9 +8,7 @@ install_aliases()
 
 #End of Python 2 and 3 compatibility
 
-#from wsgiref.simple_server import make_server
 from gevent.pywsgi import WSGIServer
-from cgi import parse_qs, escape
 from email.utils import formatdate
 
 import string
