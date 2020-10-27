@@ -83,7 +83,7 @@ def compute_pulse_weights(stream, window, filename='computed_weights.pkl'):
 format to <filename>. Thresholds are hardcoded and inspection of the 
 pulse selected is highly recommended.'''
     # find a window with one pulse only
-    print('entering compute_pulse_weights')
+    print('# entering compute_pulse_weights')
     sL =  len(stream) - window
     threshold = 0.3 # (volt(20.) - volt(0)) * 100.
     rise = 10
@@ -94,7 +94,7 @@ pulse selected is highly recommended.'''
         if stream[i + rise] - stream[i] > threshold:
             # found one peak in m
             m = np.argmax(stream[i:i + window])
-            print('found peak at ', m)
+            print('# found peak at ', m)
             ##for j, s in enumerate(stream[max(0, i + m - window):i + m + window]):
             ##    print('##', j, s)
             ##print("##\n##\n")
@@ -112,7 +112,7 @@ pulse selected is highly recommended.'''
                 print('##', j, s)
             break
         i = i + int(window / 4.)
-    print('exiting compute_pulse_weights')
+    print('# exiting compute_pulse_weights')
     # save the pulse
     pickle.dump(fir, open(filename, 'wb'))
     sys.exit(1)
@@ -316,16 +316,15 @@ def compute_correlations(peaks_a, peaks_max_a, peaks_b, peaks_max_b, window=400)
 def analyze(data, acc):
     """Analyze the data in `data' and store quantities in the accumulator `acc'"""
 
-    #fir = load_amplitude_reco_weights('pulse_weights.pkl')
-    fir = load_amplitude_reco_weights('computed_weights.pkl')
-
-    print(len(fir), fir)
+    ##fir = load_amplitude_reco_weights('pulse_weights.pkl')
+    #fir = load_amplitude_reco_weights('computed_weights.pkl')
+    #print(len(fir), fir)
 
     signal_processing =  cfg.cfg.get('analysis', 'signal_processing', fallback = '')
 
     if signal_processing == 'butterworth':
         butterworth = True
-        print("Using Butterworth filter for signal processing")
+        print("# Using Butterworth filter for signal processing")
     else:
         butterworth = False
 
@@ -351,9 +350,10 @@ def analyze(data, acc):
     n_max_chunk = cfg.cfg.getint('data', 'n_max_chunk', fallback=-1)
         
     ## analyze independent channels
+    tot_samples_read = 0
     for i, f in enumerate(data):
 
-        print('Processing file', f, '(%d)' % i)
+        print('# Processing file', f, '(%d)' % i)
         # to avoid a too big file loaded in RAM, split the reading in parts
         # and accumulate the results in acc
         #d = read_data(f, max_samples)
@@ -367,7 +367,7 @@ def analyze(data, acc):
                 print("# skipping file/chunk %d (%d samples - %f hours)" % (i, len(d), duration))
                 continue
             ###print("# processing file %d (%d samples - %f hours)" % (i, len(d), duration))
-            print("Progress: %.1f%%" % (h.progress()*100.))
+            print("# Progress: %.1f%%" % (h.progress()*100.))
             d = volt(d) / gain[i]
             suff = '_det%03d' % i
             det = i + 1
@@ -376,11 +376,12 @@ def analyze(data, acc):
 
             #compute_pulse_weights(d, 200)
 
-            #for j, s in enumerate(d):
-            #    #if j > 500000:
-            #    #    break
-            #    print(i, j, s)
-            #print('\n')
+            ##for j, s in enumerate(d):
+            ##    if j > 50000:
+            ##        break
+            ##    print(i, j, s)
+            ##print('\n')
+            ##continue
             #import sys
             #sys.exit(0)
 
@@ -432,5 +433,8 @@ def analyze(data, acc):
             n_samples_read += h.last_chunk_size
             #print('-->', h.last_chunk_size, n_samples_read)
 
+        tot_samples_read += n_samples_read
+
+    return tot_samples_read
     #import sys
     #sys.exit(0)

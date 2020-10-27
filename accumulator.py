@@ -177,7 +177,7 @@ class detinfo:
                 self.fft_n = n
             else:
                 if (len(self.fft) != len(pxx)):
-                    print('Warning: chunk of data does not have enough points for full granularity FFT, skipping.')
+                    print('# Warning: chunk of data does not have enough points for full granularity FFT, skipping.')
                     return
                 self.fft = list(np.add(np.multiply(self.fft, self.fft_n), np.multiply(pxx, n)) / (self.fft_n + n))
             if len(f) != len(self.fft_f) or f[-1] != self.fft_f[-1]:
