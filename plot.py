@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 import configure as cfg
 
 import os
@@ -257,7 +260,7 @@ def plot_correlations(peaks_a, peaks_max_a, det_a, peaks_b, peaks_max_b, det_b, 
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_a_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot "'+fname+'"'+" u ($1):($2) not w p lt 6 pt 7 ps 0.125")
+        gp.c('plot [][:15e-6] "'+fname+'"'+" u ($1):($2) not w p lt 6 pt 7 ps 0.125")
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)

@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 import configure as cfg
 
 import bisect

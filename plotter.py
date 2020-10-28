@@ -1,4 +1,6 @@
 #!/usr/bin/env python3.7
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
 
 import argparse
 import glob

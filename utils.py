@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 import struct
 import numpy as np
 import matplotlib.pyplot as plt

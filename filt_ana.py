@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 from numba import jit
 from scipy.signal import butter, lfilter
 
