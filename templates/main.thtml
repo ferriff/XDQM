@@ -2,27 +2,32 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <!-- Generated from data/head-home.php, ../../smarty/{head.tpl} -->
 <head>
-<title>Cupid Data Quality Monitoring</title>
+<title>Cross/Cupid Data Quality Monitoring</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <link rel="Help" href="/Help/" />
-<link rel="stylesheet" href="css/dqm.css" type="text/css" media="all" />
-</style>
-<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID experiment"
+<link rel="stylesheet" href="/css/dqm.css$css_version" type="text/css" media="all" />
+<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"
 </head>
-<body>
+<body style="display:none;">
   <div class="header">
-    <h1>Cupid Data Quality Monitoring</h1>
+    <h1>Cross/Cupid Data Quality Monitoring</h1>
   </div>
   <div class="topnav">
     <a href="/">Home</a>
-    <a href="live">Live</a>
-    <a href="runs">Runs</a>
+    <a href="/nav?path=$live_subdir">Live</a>
+    <a href="/nav?path=$run_subdir">Runs</a>
+    <div class="top_nav_ruler"></div>
+    <form action="/run" class="run_num_form">
+      Run&nbsp;<input type="text" id="num" maxlength="6" size="6" name="num" value="$run_num"><input style="visibility: hidden" type="submit" value="">
+    </form>
   </div>
-  <div class="content $content_class">
+  <div class="path">
+    $path 
+  </div>
+  <div class="content"> <div class="$content_class">
     $content
-  </div>
+  </div></div>
   <div class="footer">
     Designed by Ph. Gras &amp; F. Ferri. CEA/IRFU
-  </div>
-  
+  </div>  
 </body>
