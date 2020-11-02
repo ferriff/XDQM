@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 import configure as cfg
 
 import os
@@ -45,6 +48,7 @@ def gp_set_defaults():
     gp.c('set label "{/=16 Canfranc}" at graph 1, graph 1.1 right')
     gp.c('set label 101 "Last updated on ".system("date -u \\"+%a %e %b %Y %R:%S %Z\\"") at screen .975, graph 1 rotate by 90 right font ",12" tc "#999999"')
     gp.c('hour(x) = x / ' + str(cfg.params.sampling_freq) + ' / 3600.')
+    gp.c('uvolt(x) = x * 1e6')
     gp.c('odir = "' + cfg.global_odir + '/"')
     if cfg.tmpdir == '':
         cfg.tmpdir = tempfile.mkdtemp(prefix='tmp_out_', dir='.')
@@ -65,13 +69,13 @@ def plot_amplitude(maxima, suffix, det):
     gp.c('set label "' + det_name + ' ' + det_feat + ' - amplitude spectrum" at graph 0, graph 1.04 noenhanced')
     gp.c('set log y')
     gp.c('set log x')
-    gp.c('set ylabel "Events / V"')
-    gp.c('set xlabel "Amplitude (V)"')
+    gp.c('set ylabel "Events / {/Symbol m}V"')
+    gp.c('set xlabel "Amplitude ({/Symbol m}V)"')
     gp.s([edges[:-1], values], filename=fname)
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot [][0.5:] "'+fname+'" u 1:2 not w histep lt 6')
+        gp.c('plot [][0.5:] "'+fname+'" u (uvolt($1)):2 not w histep lt 6')
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
@@ -91,12 +95,12 @@ def plot_peaks(peaks, peaks_max, suffix, det):
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set log y')
-    gp.c('set ylabel "Amplitude (V)"')
+    gp.c('set ylabel "Amplitude ({/Symbol m}V)"')
     gp.c('set xlabel "Time (h)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w p pt 6 ps 0.125 lt 6")
+        gp.c('plot "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w p pt 6 ps 0.125 lt 6")
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
@@ -105,24 +109,40 @@ def plot_peaks(peaks, peaks_max, suffix, det):
 
 def plot_baseline(base, base_min, suffix, det):
     plot_name = '10_baseline'
+    plot_name_zoom = '11_baseline_zoom'
     if len(base) == 0:
         return
     dummy, fname = tempfile.mkstemp(prefix='tmp_baseline_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name, det_feat = detector_name(det)
     os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
+    # zoomed version
+    os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name_zoom, suffix)), exist_ok=True)
     gp_set_defaults()
     gp.c('set label "' + det_name + ' ' + det_feat + ' - baseline" at graph 0, graph 1.04 noenhanced')
     gp.s([base, base_min], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('set ytics nomirror')
-    gp.c('set ylabel "Amplitude (V)"')
+    gp.c('set ylabel "Amplitude ({/Symbol m}V)"')
     gp.c('set xlabel "Time (h)"')
     #gp.c('set yrange [%f:%f]' % (pmin, pmax))
+    gp.c('stats "'+fname+'" u (uvolt($2) < -8000 ? NaN : uvolt($2)) nooutput')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot "'+fname+'"'+" u (hour($1)):($2) not w l lt 6")
+        gp.c('plot "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w l lt 6")
+        gp.c('set out')
+        # zoomed version
+        gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot_name_zoom, suffix, plot_name_zoom, suffix, ext))
+        yrange = cfg.cfg.get('plot', 'baseline_range_ch%03d' % det, fallback='[]')
+        yr = yrange.strip('[]').split(':')
+        if len(yr) == 2:
+            for i in range(2):
+                if yr[i] != '' and yr[i] != '*':
+                    yr[i] = 'uvolt(' + yr[i] + ')'
+            yrange = '[' + yr[0] + ':' + yr[1] + ']'
+        #gp.c('plot []'+ yrange +' "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w l lt 6")
+        gp.c('plot [][STATS_min:STATS_max] "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w l lt 6")
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
@@ -147,7 +167,7 @@ def plot_pulse_shapes(shapes, suffix, det):
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
     gp.c('load "blues.pal"')
-    gp.c('set ylabel "Amplitude (V)"')
+    gp.c('set ylabel "Amplitude ({/Symbol m}V)"')
     gp.c('set xlabel "Time (ms)"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
@@ -156,7 +176,7 @@ def plot_pulse_shapes(shapes, suffix, det):
         gp.c('set out')
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot1_name, suffix, plot1_name, suffix, ext))
         gp.c('unset colorbox')
-        gp.c('plot [][1:] "'+fname+'" u 1:2:3 not w l lt palette')
+        gp.c('plot [][1:] "'+fname+'" u 1:(uvolt($2)):3 not w l lt palette')
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
@@ -252,12 +272,12 @@ def plot_correlations(peaks_a, peaks_max_a, det_a, peaks_b, peaks_max_b, det_b, 
     gp.c('set log x')
     gp.c('set log y')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
-    gp.c('set xlabel "Amplitude (V) - Detector: %s %s"' % (det_a_name, det_a_feat))
-    gp.c('set ylabel "Amplitude (V) - Detector: %s %s"' % (det_b_name, det_b_feat))
+    gp.c('set xlabel "Amplitude ({/Symbol m}V) - Detector: %s %s"' % (det_a_name, det_a_feat))
+    gp.c('set ylabel "Amplitude ({/Symbol m}V) - Detector: %s %s"' % (det_b_name, det_b_feat))
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_a_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot "'+fname+'"'+" u ($1):($2) not w p lt 6 pt 7 ps 0.125")
+        gp.c('plot [][] "'+fname+'"'+" u (uvolt($1)):(uvolt($2)) not w p lt 6 pt 7 ps 0.125")
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)

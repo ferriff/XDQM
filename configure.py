@@ -1,3 +1,6 @@
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
+
 import configparser
 import pickle
 
@@ -11,10 +14,13 @@ class Parameters:
         self.sampling_freq = 0
 
 
-def init():
+def init(config_file):
 
     global cfg
-    cfg = parse_config('configuration.cfg')
+    cfg = parse_config(config_file)
+
+    global cfg_file
+    cfg_file = config_file
 
     global params
     params = Parameters()
@@ -35,6 +41,9 @@ def init():
 
     global global_odir
     global_odir = "./out/"
+
+    #global noise_threshold
+    #noise_threshold = float(cfg['analysis']['noise_threshold'])
 
     global ampl_reco_weights
     #ampl_reco_weights = pickle.load(open('amplitude_reco_weights.pkl', 'rb'))

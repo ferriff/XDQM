@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# Copyright 2019-2020 F. Ferri, Ph. Gras
 
 #Python 2 and 3 compatibility
 #Ref.: https://python-future.org/compatible_idioms.html
