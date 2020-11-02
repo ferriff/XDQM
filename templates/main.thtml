@@ -6,7 +6,8 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <link rel="Help" href="/Help/" />
 <link rel="stylesheet" href="/css/dqm.css$css_version" type="text/css" media="all" />
-<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"
+<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"/>
+$bokeh_header
 </head>
 <body style="display:none;">
   <div class="header">

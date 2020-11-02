@@ -23,6 +23,12 @@ import sys
 import copy
 import html
 import time
+import json
+
+from bokeh.embed import json_item
+from bokeh.plotting import figure
+from bokeh.resources import CDN
+
 
 #Message display verbosity. Default is 1.
 #Controlled with the -q (set to 0) and -v (increase by 1) options
@@ -141,12 +147,12 @@ def _look_for_img(base, exts):
             return img_path
     return None
 
-def get_plots(plot_dir):
+def get_plots(plot_subdir):
     i = 0
     lres_exts = ["png", "gif", "jpg", "jpeg"]
     hres_exts = ["svg.gz", "svgz", "svg"]
     all_exts = list(set(lres_exts + hres_exts))
-    paths = natural_sort(glob.iglob(plot_dir + "/*"))
+    paths = natural_sort(glob.iglob(plot_subdir + "/*"))
     for p in paths:
         i += 1
         name = os.path.basename(p)
@@ -187,10 +193,16 @@ def get_plots(plot_dir):
 
         caption_label = "Plot %d" % i
         img_alt = caption_label
-        yield {"lres_img_path": lres_img_path, "hres_img_path": hres_img_path, "img_alt": img_alt, "caption_label": caption_label, "caption_text": caption_text }
+        yield {"lres_img_path": lres_img_path,
+               "hres_img_path": hres_img_path,
+               "img_alt": img_alt,
+               "caption_label": caption_label,
+               "quoted_caption_label": urlparse.quote(caption_label),
+               "caption_text": caption_text,
+               "plot_path": urlparse.quote(os.path.relpath(p, plot_dir)) }
 
     if i == 0:
-        msg(1, "No plot found under directory %s" % plot_dir)
+        msg(1, "No plot found under directory %s" % plot_subdir)
 
 
 def add_rev(file_path):
@@ -237,7 +249,8 @@ def gen_page(content = "&nbsp", content_class="flexcontent", path=""):
                           "run_subdir": run_subdir,
                           "live_subdir": live_subdir,
                           "run_num": run_num,
-                          "css_version": css_version})
+                          "css_version": css_version,
+                          "bokeh_header": CDN.render()})
 
     return ("text/html", None), content
 
@@ -376,6 +389,86 @@ def gen_navigation_(plot_path):
 
 store.register("/nav", gen_navigation)
 #store.register("/runs", gen_navigation)
+
+
+def gen_iplot_data(environ):
+    params = urlparse.parse_qs(environ['QUERY_STRING'])
+    plot_path = ""
+    mime_type = ("application/json", None)
+    if params:
+        try:
+            plot_path = params["path"][0]
+        except KeyError:
+            msg(2, "Page run requested without passing a path")
+            pass
+
+    json_path = os.path.join(plot_dir, plot_path, os.path.basename(plot_path).rstrip(os.path.sep) + ".json")
+    try:
+        print("path:",json_path)
+        p = make_bokeh_plot(json_path)
+        return mime_type, json.dumps(json_item(p))
+                           
+    except Exception as e:
+        print('gen_iplot error:', e)
+        return mime_type, "[]"
+    
+store.register("/iplot_data", gen_iplot_data)
+
+def gen_iplot_page(environ):
+    params = urlparse.parse_qs(environ['QUERY_STRING'])
+    plot_path = ""
+    if params:
+        try:
+            plot_path = params["path"][0]
+        except KeyError:
+            msg(2, "Page run requested without passing a path")
+
+        try:
+            caption_label = params["caption_label"][0]
+        except KeyError:
+            caption_label = ""
+            
+
+
+    name = os.path.basename(plot_path)
+    p = os.path.join(plot_dir, plot_path.rstrip(os.path.sep))
+    
+    caption_file = "%s/%s.cap" % (p, name)
+    try:
+        with open(caption_file) as f:
+            caption_text = f.read(max_caption_file_size);
+    except IOError:
+        caption_text = name
+
+
+    content = build_page("templates/ifigure.thtml", {'path': urlparse.quote(plot_path),
+                                                     'caption_label': caption_label,
+                                                     'caption_text': caption_text})
+        
+
+    return gen_page(content=content, path=plot_path)
+
+store.register("/iplot", gen_iplot_page)
+
+
+    
+def make_bokeh_plot(json_path):
+    with open(json_path) as f:
+        plot  = json.load(f)
+        p = figure(title = plot["title"], sizing_mode="fixed", plot_width=400, plot_height=400)
+        p.xaxis.axis_label = plot["xtitle"]
+        p.yaxis.axis_label = plot["ytitle"]
+        color="steelblue"
+        if plot["type"] == "scatter":
+            p.scatter(plot["data"]["x"], plot["data"]["y"], color=color)
+        elif plot["type"] == "line": 
+            p.line(plot["data"]["x"], plot["data"]["y"], color=color)
+        return p
+
+
+    
+
+        
 
 def resubs(string, substitutions):
     '''Apply a list of regex substitions. The substitutions argument must a be a list of pairs (pattern, to_sustitute).'''

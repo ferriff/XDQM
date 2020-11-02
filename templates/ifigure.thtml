@@ -1,0 +1,13 @@
+<div class="figure">
+  <div class="figure-content" id="plot"></div>
+  <div class="figure-caption">
+    <span class="caption-label">$caption_label</span><span class="caption-text">$caption_text</span>
+  </div>
+
+  <script>
+  fetch('/iplot_data?path=$path')
+    .then(function(response) { return response.json(); })
+    .then(function(item) { return Bokeh.embed.embed_item(item, "plot"); })
+  </script>
+
+</div>

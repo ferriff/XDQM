@@ -1,6 +1,7 @@
 <div class="figure">
   <div class="figure-content">
-    <a href="$hres_img_path"><img src="$lres_img_path" alt="$img_alt"></img></a>
+    <!-- <a href="$hres_img_path"><img src="$lres_img_path" alt="$img_alt"></img></a> -->
+    <a href="/iplot?path=$plot_path&caption_label=$quoted_caption_label"><img src="$lres_img_path" alt="$img_alt"></img></a>
   </div>
   <div class="figure-caption">
     <span class="caption-label">$caption_label</span><span class="caption-text">$caption_text</span>
