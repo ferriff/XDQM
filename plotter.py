@@ -21,12 +21,16 @@ import plot      as plt
 def is_data_more_recent_than_plot(plotdir, datainfo):
     '''Determine if new data have arrived after a plot has been produced
 - basic implementation'''
-    flist = glob.glob(os.path.join(plotdir, 'amplitude*00/*svg*')) # FIXME: better tool...
+    #print("# --> plot_dir:", plotdir, "   path:", os.path.join(plotdir, 'amplitude*00/*svg*'))
+    flist = glob.glob(os.path.join(plotdir, 'process_configuration.cfg')) # FIXME: better tool...
     plot_time = -1
     if len(flist) > 0:
         plot_time = os.path.getmtime(flist[0])
+    if plot_time < 0:
+        return False
     data_time = os.path.getmtime(datainfo[0])
-    return plot_time > data_time
+    print("# --> plot_time:", plot_time, "   data_time:", data_time)
+    return plot_time < data_time
 
 
 def ana_dir(data_root, acc, detect_only=False, data_suff = '.bin'):
