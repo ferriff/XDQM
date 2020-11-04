@@ -142,6 +142,7 @@ def plot_baseline(base, base_min, suffix, det):
                     yr[i] = 'uvolt(' + yr[i] + ')'
             yrange = '[' + yr[0] + ':' + yr[1] + ']'
         #gp.c('plot []'+ yrange +' "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w l lt 6")
+        gp.c('set label 201 sprintf("y-range sample stddev: %4.2f {/Symbol m}V", STATS_ssd) at graph 1, graph 1.04 right')
         gp.c('plot [][STATS_min:STATS_max] "'+fname+'"'+" u (hour($1)):(uvolt($2)) not w l lt 6")
         gp.c('set out')
     fn_collector.append(fname)
@@ -294,16 +295,19 @@ def plot_correlation_deltat(det_a, det_b, deltat, suffix):
     os.makedirs(os.path.join(cfg.global_odir, det_a_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
     gp_set_defaults()
     gp.c('set label "' + det_a_name + ' ' + det_a_feat + ', ' + det_b_name + ' ' + det_b_feat + '" at graph 0, graph 1.04 noenhanced')
-    values, edges = np.histogram(np.multiply(deltat, 1e3 / cfg.params.sampling_freq), bins=1500, density=False) # convert deltat in ms
+    values, edges = np.histogram(np.multiply(deltat, 1e3 / cfg.params.sampling_freq), bins=200, range=(-5000, 5000), density=False) # convert deltat in ms
     gp.s([edges[:-1], values], filename=fname)
     gp.c('set log y')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
-    gp.c('set xlabel "Peak time %s %s - time of the closest peak of %s %s (ms)"' % (det_a_name, det_a_feat, det_b_name, det_b_feat))
+    gp.c('set xlabel "Peak time %s %s - time of the closest peak of %s %s (ms)" noenhanced' % (det_a_name, det_a_feat, det_b_name, det_b_feat))
+    gp.c('set arrow 201 from first -600, graph 0 to first -600, graph 1 nohead lc rgb "#666666" dt "-"')
+    gp.c('set arrow 202 from first +600, graph 0 to first +600, graph 1 nohead lc rgb "#666666" dt "-"')
+    gp.c('set label 203 "correlation window" at first 0, graph 0.9 center tc rgb "#666666"')
     gp.c('set ylabel "Number of events"')
     for ext in cfg.cfg['plot']['output_format'].split():
         gp_set_terminal(ext)
         gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_a_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot [-15000:15000] "'+fname+'"'+" u 1:2 not w histep lt 6")
+        gp.c('plot [-2000:2000] "'+fname+'"'+" u 1:2 not w histep lt 6")
         gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
