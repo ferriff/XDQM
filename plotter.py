@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 #
 # Copyright 2019-2020 F. Ferri, Ph. Gras
 

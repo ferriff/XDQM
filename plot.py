@@ -8,9 +8,113 @@ import numpy as np
 import PyGnuplot as gp
 import tempfile
 import time
+import gzip
 
 fn_collector = []
 
+def myopen(fname, mode = 'r'):
+    '''Opens a file with the builtin function or its gzip version depending on the file extension'''
+    ext = fname.splitext()[1]
+    if ext in ['gz', 'tgz']:
+        if 'b' not in mode:
+            mode += 'b'
+        return gzip.open(fname, mode)
+    else:
+        return open(fname, mode)
+
+def xdqm_plot(xdata, ydata, plot_name, det, fmts=None, plot_type = 'scatter', title = "",
+              xrange = None, yrange = None, xtitle = "", ytitle = "",
+              logx = False, logy = False, tmpfile_prefix = 'tmp'):
+
+    
+    
+    if fmts is None:
+        fmts = cfg.cfg['plot']['output_pf']
+
+    for fmt in fmts:
+
+        dirname = os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix))
+        os.makedirs(dirname, exist_ok=True)
+
+        fpath =  os.path.join(dirname, '%s.%s' % (plot_name, fmt), exist_ok=True)
+
+
+        if fmt in ['json', 'json.gz']:
+            return plot_json(xdata=xdata, ydata=ydata, fpath=fpath, fmt=fmt, plot_type=plot_type,
+                           title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
+                           logx=logx, logy=logy)
+        else:
+            return plot_gp(xdata=xdata, ydata=ydata, fpath=fpath, fmt=fmt, plot_type=plot_type,
+                           title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
+                           logx=logx, logy=logy)
+        
+    
+def plot_json(xdata, ydata, output_filepath, plot_type = 'scatter', title = "",
+              xrange = None, yrange = None, xtitle = "", ytitle = "",
+              logx = False, logy = False):
+    '''Write plot data in XDQM format used to produce interacive plots.'''
+
+    with myopen(output_filepath, "w") as fout:
+        rec = { 'xdata': xdata,
+                'ydata': ydata,
+                'type' : plot_type,
+                'title': title,
+                'xrange': xrange,
+                'yrange': yrange,
+                'xtitle': xtitle,
+                'ytitle': ytitle,
+                'logx': logx,
+                'logy': logy
+               }
+        
+        json.dump(rec, fout)
+
+
+def plot_gp(xdata, ydata, output_path, fmt, type = 'scatter', title = "",
+            xrange = None, yrange = None, xtitle = "", ytitle = "",
+            logx = False, logy = False, tmpfile_prefix = 'tmp'):
+
+    gp_options =  {'hist': 'not w histep lt 6',
+                   'scatter': 'not w p lt 6 pt 7 ps 0.125',
+                   'lines': 'not w l lt 6'}
+    dummy, fname = tempfile.mkstemp(prefix, suffix='.dat', dir=cfg.tmpdir, text=True)
+
+    xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
+    xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
+    xbin = cfg.cfg.getfloat("plot", "ampl_bin", fallback=1000)
+
+    
+    os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
+
+    gp_set_defaults()
+
+    gp.s(xdata, ydata, filename=fname)
+    
+    gp.c('set label "%s" at graph 0, graph 1.04 noenhanced' % title)
+    if logy:
+        gp.c('set log y')
+
+    if logx:
+        gp.c('set log x')
+        
+    gp.c('set ylabel "%s"' % ytitle)
+    gp.c('set xlabel "%s"' % xtitle)
+    gp.c('set auto fix')
+    gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
+
+    gp_set_terminal(fmt)
+    
+    gp.c('set out "%s"' % output_path)
+    gp.c('plot %s%s "%s" u 1:2 %s' % (gp_range(xrange), g_range(yrange), output_path))
+    gp.c('set out')
+    fn_collector.append(fname)
+    os.close(dummy)
+
+def gp_range(range):
+         '''Convert of 2-tuple of lower and upper bounds to a gnuplot range string.'''
+
+         return '[%s:%s]' % map(lambda x: "%g" % x if x else "", range) 
+        
 def clean_tmpfiles():
     print('Waiting 10 sec to clean temporary files and directories...')
     time.sleep(10)
@@ -34,6 +138,7 @@ def gp_set_terminal(t):
     else:
         print('Terminal `%s\' not supported' % t)
 
+uvolt = 1.e-6
 
 def gp_set_defaults():
     gp.c('reset')
@@ -57,40 +162,25 @@ def gp_set_defaults():
 
 def plot_amplitude(maxima, suffix, det):
     plot_name = '00_amplitude'
-    dummy, fname = tempfile.mkstemp(prefix='tmp_amplitude_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name, det_feat = detector_name(det)
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
-    xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
+    xmax = cfg.cfg.getpfloat("plot", "ampl_max", fallback=1.)
     xbin = cfg.cfg.getfloat("plot", "ampl_bin", fallback=1000)
-    os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
+
     #values, edges = np.histogram(maxima, bins=1500, range=(xmin, xmax), density=False)
     values, edges = np.histogram(maxima, bins=1500, density=False)
-    gp_set_defaults()
-    gp.c('set label "' + det_name + ' ' + det_feat + ' - amplitude spectrum" at graph 0, graph 1.04 noenhanced')
-    gp.c('set log y')
-    gp.c('set log x')
-    gp.c('set ylabel "Events / {/Symbol m}V"')
-    gp.c('set xlabel "Amplitude ({/Symbol m}V)"')
-    gp.s([edges[:-1], values], filename=fname)
-    for ext in cfg.cfg['plot']['output_format'].split():
-        gp_set_terminal(ext)
-        gp.c('set out odir."%s/%s%s/%s%s.%s"' % (det_name, plot_name, suffix, plot_name, suffix, ext))
-        gp.c('plot [][0.5:] "'+fname+'" u (uvolt($1)):2 not w histep lt 6')
-        gp.c('set out')
-    fn_collector.append(fname)
-    os.close(dummy)
 
+    xdqm_plot(xdata=edges[:-1]/uvolt, ydata=values, plot_name=plot_name, det=det, suffix=suffix, plot_type='hist',
+              title='', xrange=[xmin, xmax]) 
 
 
 def plot_peaks(peaks, peaks_max, suffix, det):
     plot_name= '20_peaks'
     if len(peaks) == 0:
         return
-    dummy, fname = tempfile.mkstemp(prefix='tmp_peaks_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
-    det_name, det_feat = detector_name(det)
-    os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
-    gp_set_defaults()
-    gp.c('set label "' + det_name + ' ' + det_feat + ' - signal peaks" at graph 0, graph 1.04 noenhanced')
+
+    title = det_name + ' ' + det_feat + ' - signal peaks'
+         
     gp.s([peaks, peaks_max], filename=fname)
     gp.c('set auto fix')
     gp.c('set offsets graph 0.1, graph 0.1, graph 0.1, graph 0.1')
