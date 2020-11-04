@@ -8,7 +8,7 @@ import numpy as np
 import plot      as plt
 import analyze   as ana
 
-import pickle
+import _pickle as pickle
 import sys
 
 class accumulator:
@@ -94,7 +94,9 @@ class accumulator:
     def dump(self, filename):
         """Dump the stored information to a file."""
         f = open(filename, 'wb')
-        pickle.dump(self, f)
+        p = pickle.Pickler(f)
+        p.fast = True
+        p.dump(self)
 
 
     def print(self):
@@ -107,7 +109,8 @@ class accumulator:
     def load(cls, filename):
         """Load the information from a file."""
         f = open(filename, 'rb')
-        return pickle.load(f)
+        p = pickle.Upickler(f)
+        return p.load()
 
 
 
