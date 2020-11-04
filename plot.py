@@ -164,7 +164,7 @@ def plot_amplitude(maxima, suffix, det):
     plot_name = '00_amplitude'
     det_name, det_feat = detector_name(det)
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
-    xmax = cfg.cfg.getpfloat("plot", "ampl_max", fallback=1.)
+    xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
     xbin = cfg.cfg.getfloat("plot", "ampl_bin", fallback=1000)
 
     #values, edges = np.histogram(maxima, bins=1500, range=(xmin, xmax), density=False)
