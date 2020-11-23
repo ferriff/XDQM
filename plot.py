@@ -9,12 +9,14 @@ import PyGnuplot as gp
 import tempfile
 import time
 import gzip
+import re
+import json
 
 fn_collector = []
 
 def myopen(fname, mode = 'r'):
     '''Opens a file with the builtin function or its gzip version depending on the file extension'''
-    ext = fname.splitext()[1]
+    ext = os.path.splitext(fname)[1]
     if ext in ['gz', 'tgz']:
         if 'b' not in mode:
             mode += 'b'
@@ -22,45 +24,51 @@ def myopen(fname, mode = 'r'):
     else:
         return open(fname, mode)
 
-def xdqm_plot(xdata, ydata, plot_name, det, fmts=None, plot_type = 'scatter', title = "",
-              xrange = None, yrange = None, xtitle = "", ytitle = "",
-              logx = False, logy = False, tmpfile_prefix = 'tmp'):
-
+def xdqm_plot(xdata, ydata, plot_name, det, suffix, fmts=None, plot_type = 'scatter', title = "",
+              xrange = [None, None], yrange = [None, None], xtitle = "", ytitle = "",
+              logx = False, logy = False):
     
+    det_name, det_feat = detector_name(det)
+
+    m = re.match(r'[^_]*_(.*)', plot_name)
+    if m:
+        tmpfile_prefix = m.groups()[0] + "%02d" % det
+    else:
+        tmpfile_prefix = plot_name + "%02d" % det
     
     if fmts is None:
-        fmts = cfg.cfg['plot']['output_pf']
+        fmts = cfg.cfg['plot']['output_format'].split()
 
     for fmt in fmts:
 
         dirname = os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix))
         os.makedirs(dirname, exist_ok=True)
 
-        fpath =  os.path.join(dirname, '%s.%s' % (plot_name, fmt), exist_ok=True)
+        fpath =  os.path.join(dirname, '%s.%s' % (plot_name, fmt))
 
 
         if fmt in ['json', 'json.gz']:
-            return plot_json(xdata=xdata, ydata=ydata, fpath=fpath, fmt=fmt, plot_type=plot_type,
-                           title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
-                           logx=logx, logy=logy)
+            plot_json(xdata=xdata, ydata=ydata, output_filepath=fpath, fmt=fmt, plot_type=plot_type,
+                      title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
+                      logx=logx, logy=logy)
         else:
-            return plot_gp(xdata=xdata, ydata=ydata, fpath=fpath, fmt=fmt, plot_type=plot_type,
-                           title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
-                           logx=logx, logy=logy)
+            plot_gp(xdata=xdata, ydata=ydata, output_filepath=fpath, fmt=fmt, plot_type=plot_type,
+                    title=title , xrange=xrange, yrange=yrange, xtitle=xtitle, ytitle=ytitle,
+                    logx=logx, logy=logy, tmpfile_prefix=tmpfile_prefix)
         
     
-def plot_json(xdata, ydata, output_filepath, plot_type = 'scatter', title = "",
+def plot_json(xdata, ydata, output_filepath, plot_type = 'scatter', title = "", fmt = "json",
               xrange = None, yrange = None, xtitle = "", ytitle = "",
               logx = False, logy = False):
     '''Write plot data in XDQM format used to produce interacive plots.'''
 
     with myopen(output_filepath, "w") as fout:
-        rec = { 'xdata': xdata,
-                'ydata': ydata,
+        rec = { 'xdata': list(xdata.astype('float64')),
+                'ydata': list(ydata.astype('float64')),
                 'type' : plot_type,
                 'title': title,
-                'xrange': xrange,
-                'yrange': yrange,
+                'xrange': list(xrange),
+                'yrange': list(yrange),
                 'xtitle': xtitle,
                 'ytitle': ytitle,
                 'logx': logx,
@@ -70,25 +78,29 @@ def plot_json(xdata, ydata, output_filepath, plot_type = 'scatter', title = "",
         json.dump(rec, fout)
 
 
-def plot_gp(xdata, ydata, output_path, fmt, type = 'scatter', title = "",
+def plot_gp(xdata, ydata, output_filepath, fmt, plot_type = 'scatter', title = "",
             xrange = None, yrange = None, xtitle = "", ytitle = "",
-            logx = False, logy = False, tmpfile_prefix = 'tmp'):
+            logx = False, logy = False, tmpfile_prefix='tmp_xdqm'):
 
     gp_options =  {'hist': 'not w histep lt 6',
                    'scatter': 'not w p lt 6 pt 7 ps 0.125',
                    'lines': 'not w l lt 6'}
-    dummy, fname = tempfile.mkstemp(prefix, suffix='.dat', dir=cfg.tmpdir, text=True)
+
+    try:
+        gp_option =  gp_options[plot_type]
+    except KeyError:
+        raise("Bug found. Plot type %s is not suppoted by the plot_gp function." % plot_type) 
+
+    dummy, fname = tempfile.mkstemp(prefix=tmpfile_prefix, suffix='.dat', dir=cfg.tmpdir, text=True)
 
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
     xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
     xbin = cfg.cfg.getfloat("plot", "ampl_bin", fallback=1000)
 
     
-    os.makedirs(os.path.join(cfg.global_odir, det_name, '%s%s' % (plot_name, suffix)), exist_ok=True)
-
     gp_set_defaults()
 
-    gp.s(xdata, ydata, filename=fname)
+    gp.s([xdata, ydata], filename=fname)
     
     gp.c('set label "%s" at graph 0, graph 1.04 noenhanced' % title)
     if logy:
@@ -104,8 +116,8 @@ def plot_gp(xdata, ydata, output_path, fmt, type = 'scatter', title = "",
 
     gp_set_terminal(fmt)
     
-    gp.c('set out "%s"' % output_path)
-    gp.c('plot %s%s "%s" u 1:2 %s' % (gp_range(xrange), g_range(yrange), output_path))
+    gp.c('set out "%s"' % output_filepath)
+    gp.c('plot %s%s "%s" u 1:2 %s' % (gp_range(xrange), gp_range(yrange), fname, gp_option))
     gp.c('set out')
     fn_collector.append(fname)
     os.close(dummy)
@@ -113,7 +125,7 @@ def plot_gp(xdata, ydata, output_path, fmt, type = 'scatter', title = "",
 def gp_range(range):
          '''Convert of 2-tuple of lower and upper bounds to a gnuplot range string.'''
 
-         return '[%s:%s]' % map(lambda x: "%g" % x if x else "", range) 
+         return '[%s:%s]' % tuple(map(lambda x: "%g" % x if x else "", range))
         
 def clean_tmpfiles():
     print('Waiting 10 sec to clean temporary files and directories...')
@@ -131,12 +143,13 @@ def detector_name(det):
 
 
 def gp_set_terminal(t):
-    if   t == 'svg':
+    if t == 'svg':
         gp.c('set terminal svg size 600,480 font "Helvetica,16" background "#ffffff" enhanced')
     elif t == 'png':
         gp.c('set term pngcairo enhanced font "Helvetica,12"')
     else:
-        print('Terminal `%s\' not supported' % t)
+        #print('Terminal `%s\' not supported' % t)
+        raise RuntimeError('Terminal `%s\' not supported' % t)
 
 uvolt = 1.e-6
 
@@ -166,6 +179,9 @@ def plot_amplitude(maxima, suffix, det):
     xmin = cfg.cfg.getfloat("plot", "ampl_min", fallback=0.)
     xmax = cfg.cfg.getfloat("plot", "ampl_max", fallback=1.)
     xbin = cfg.cfg.getfloat("plot", "ampl_bin", fallback=1000)
+    title = 'set label "' + det_name + ' ' + det_feat + ' - amplitude spectrum" at graph 0, graph 1.04 noenhanced'
+    ytitle = 'Events / {/Symbol m}V'
+    xtitle = 'Amplitude ({/Symbol m}V)'
 
     #values, edges = np.histogram(maxima, bins=1500, range=(xmin, xmax), density=False)
     values, edges = np.histogram(maxima, bins=1500, density=False)
@@ -175,10 +191,15 @@ def plot_amplitude(maxima, suffix, det):
 
 
 def plot_peaks(peaks, peaks_max, suffix, det):
+
+    return
+
     plot_name= '20_peaks'
     if len(peaks) == 0:
         return
 
+    gp_set_defaults()
+    
     title = det_name + ' ' + det_feat + ' - signal peaks'
          
     gp.s([peaks, peaks_max], filename=fname)
@@ -198,6 +219,9 @@ def plot_peaks(peaks, peaks_max, suffix, det):
 
 
 def plot_baseline(base, base_min, suffix, det):
+
+    return
+    
     plot_name = '10_baseline'
     plot_name_zoom = '11_baseline_zoom'
     if len(base) == 0:
@@ -240,6 +264,9 @@ def plot_baseline(base, base_min, suffix, det):
 
 
 def plot_pulse_shapes(shapes, suffix, det):
+
+    return
+    
     plot1_name = 'XX_shapes'
     plot2_name = 'XX_normalized_shapes'
     dummy, fname = tempfile.mkstemp(prefix='tmp_shapes_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
@@ -274,6 +301,9 @@ def plot_pulse_shapes(shapes, suffix, det):
 
 
 def plot_rate(rate, window, suffix, det):
+
+    return
+    
     plot_name = 'XX_rate'
     dummy, fname = tempfile.mkstemp(prefix='tmp_rate_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name, det_feat = detector_name(det)
@@ -296,6 +326,9 @@ def plot_rate(rate, window, suffix, det):
 
 
 def plot_fft_rate(freq, power, suffix, det):
+
+    return
+    
     plot_name = 'XX_fft_rate'
     dummy, fname = tempfile.mkstemp(prefix='tmp_fft_rate_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name, det_feat = detector_name(det)
@@ -319,6 +352,10 @@ def plot_fft_rate(freq, power, suffix, det):
 
 
 def plot_fft_data(freq, power, suffix, det):
+
+
+    return
+    
     plot_name = '30_fft_data'
     dummy, fname = tempfile.mkstemp(prefix='tmp_fft_data_%03d' % det, suffix='.dat', dir=cfg.tmpdir, text=True)
     det_name, det_feat = detector_name(det)
@@ -347,6 +384,9 @@ def plot_fft_data(freq, power, suffix, det):
 
 
 def plot_correlations(peaks_a, peaks_max_a, det_a, peaks_b, peaks_max_b, det_b, suffix):
+
+    return
+    
     plot_name = '40_corr_peaks'
     if len(peaks_a) == 0:
         return
@@ -374,6 +414,9 @@ def plot_correlations(peaks_a, peaks_max_a, det_a, peaks_b, peaks_max_b, det_b, 
 
 
 def plot_correlation_deltat(det_a, det_b, deltat, suffix):
+
+    return
+    
     plot_name = '41_corr_deltat'
     if len(deltat) == 0:
         return
