@@ -69,13 +69,37 @@
     align-self: center;
 }
 
-.run_num_form input#num {
+.run_num_form input.run_chunk {
     text-align: center;
     background-color: #3696C1;
     color: white;
     border: 0px;
     border-radius: 5px;
     padding: 4px;
+}
+
+.run_num_form input.run_chunkdisabled {
+    text-align: center;
+    background-color: #3696C1;
+    color: darkgray;
+    border: 0px;
+    border-radius: 5px;
+    padding: 4px;
+}
+
+.run_num_form .compare_label_{
+}
+
+.run_num_form .compare_label_disabled {
+    color: darkgray;
+}
+
+.run_num_form input#ref_run_chunk:disabled {
+    color: darkgray;
+}
+
+.run_num_form input#compare {
+    background-color: #3696C1;
 }
 .top_nav_ruler{
     flex-grow: 1;

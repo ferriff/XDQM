@@ -6,23 +6,28 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <link rel="Help" href="/Help/" />
 <link rel="stylesheet" href="/css/dqm.css$css_version" type="text/css" media="all" />
-<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"
+<meta name="description" content="Online monitoring of the quality of data acquired for the CUPID/CROSS experiment"/>
 </head>
 <body style="display:none;">
   <div class="header">
     <h1>Cross/Cupid Data Quality Monitoring</h1>
   </div>
   <div class="topnav">
-    <a href="/">Home</a>
-    <a href="/nav?path=$live_subdir">Live</a>
-    <a href="/nav?path=$run_subdir">Runs</a>
+    <a href="?page=home">Home</a>
+<!--    <a href="/nav?path=$live_subdir">Live</a> -->
+    <a href="?page=nav&path=$run_subdir">Runs</a>
+    <a href="?page=run&run_chunk=-1">Latest</a>
     <div class="top_nav_ruler"></div>
-    <form action="/run" class="run_num_form">
-      Run&nbsp;<input type="text" id="num" maxlength="6" size="6" name="num" value="$run_num"><input style="visibility: hidden" type="submit" value="">
+    <form action="" class="run_num_form">
+      Run.chunk&nbsp;<input type="text" id="run_chunk" class="run_chunk" maxlength="10" size="10" name="run_chunk" value="$run_chunk">
+	<input type="checkbox" id="compare" name="compare" value="on" onChange="document.getElementById('submit').click()" $compare_checked/>
+	<label for="compare" class="compare_label_$compare_disabled"> compare with</label>&nbsp;<input type="text" id="ref_run_chunk" class="run_chunk$compare_disabled" maxlength="10" size="10" name="ref_run_chunk" value="$ref_run_chunk">
+	<input style="visibility: hidden" type="submit" id="submit" name="page" value="run">
+	<input type="hidden" name="path" value="$path">
     </form>
   </div>
   <div class="path">
-    $path 
+    $path_nav 
   </div>
   <div class="content"> <div class="$content_class">
     $content

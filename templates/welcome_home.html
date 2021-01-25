@@ -1,15 +1,23 @@
 <div class="welcome">
         <div class="welcome-title">
-                <h3> Welcome to the Cross/Cupid Data Quality Monitoring </h3>
+                <h2> Welcome to the Cross/Cupid Data Quality Monitoring </h2>
         </div>
         <div class="welcome-text">
                 <p>
-                Plots are in the <a class="welcome-link" href=/runs>Runs</a> tab, ordered in
-                folders with the same structure as the acquired runs. Additionally,
-                they are grouped by runs and chunks, as the DAQ writes the data.
+                Plots are in the <a class="welcome-link" href=/nav?path=runs>Runs</a> tab, ordered in
+                folders that follows the structure used by the DAQ. Data of a run are split in chunks
+		numbered in the order of acquisition time statring from 000.
                 </p>
+		<h3>Tips</h3>
+		<p>
+		  <ul>
+		    <li>To browse the runs, click on "Runs"
+		    <li>To display the latest acquired data (latest chunk of latest run), click on "Latest".
+		    <li>To jump to a specific run chunk, you can enter its identifier the format RUN#.CHUNK# in the Run.chunk field. If CHUNK# is omitted, the last chunk of the run is used.
+		    <li>To compare the plots of two runs, check the box in front of "compare to" and enter the reference RUN#.CHUNK# in the field that follows.
+		  </ul>
                 <p>
-                Documentation on how the plots are produced is available <a class="welcome-link" href="">here</a>.
+                <!-- Documentation on how the plots are produced is available <a class="welcome-link" href="">here</a>.-->
                 </p>
         </div>
 </div>
