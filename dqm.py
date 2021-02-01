@@ -32,7 +32,11 @@ import time
 #Controlled with the -q (set to 0) and -v (increase by 1) options
 verb = 1
 
-live_subdir = 'live'
+root_dir = "."
+extra_root_dirs=["/home/dqm/dqm/xdqm-devel"]
+plot_dir = "store/runs/DATA"
+run_subdir = ''
+live_subdir = ''
 plot_not_found = "store/plot_not_found.png"
 web_root = "/"
 run_num_format = "%06d" #format of run directory names
@@ -350,6 +354,12 @@ def gen_page(content = "&nbsp", content_class="flexcontent", path="", root="Home
 
     return ("text/html", None), content
 
+def gen_home(environ):
+    s = open("templates/welcome_home.html").read()
+    return gen_page(content=s)
+
+
+
 def gen_run(environ):
 
     params = urlparse.parse_qs(environ['QUERY_STRING'])
@@ -642,8 +652,6 @@ def change_run_and_chunk_in_path(path, run_num, chunk_num):
     #ensure return path exists.
     #If it doesnt(e.g. requested chunk or run does not exist),
     #we go up to one directory until we find an existing directory:
-    print("plot_dir: %s, path: %s" % (str(plot_dir), str(path)))
-
     i = len(dirs)
     while i > 0:
         path = os.path.join(*dirs[:i])
