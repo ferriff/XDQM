@@ -34,8 +34,9 @@ verb = 1
 
 root_dir = "."
 extra_root_dirs=["/home/dqm/dqm/xdqm-devel"]
-plot_dir = "store/runs/DATA"
-run_subdir = ''
+plot_dir = "store/runs"
+run_subdir = 'DATA'
+cryo_subdir = 'cryo'
 live_subdir = ''
 plot_not_found = "store/plot_not_found.png"
 web_root = "/"
@@ -48,6 +49,12 @@ css_file = os.path.join(root_dir, 'css/dqm.css')
 max_caption_file_size = 1024*1024
 max_static_page_size = 100*1024*1024
 
+# Priorities to modify order of run and cryo-day folders when listed
+# 0: no modification
+# >0: push to top of the list, highest value first
+# <0: push to top of the list, most negative last
+dir_priorities = {"Now": 1}
+
 def n_subdirs(dir):
     '''Return the number of subdirectory the directory dir contains'''
     n = 0
@@ -57,10 +64,10 @@ def n_subdirs(dir):
 
     return n
 
-def natural_sort(l):
+def natural_sort(l, reverse = False):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
-    return sorted(l, key = alphanum_key)
+    return sorted(l, key = alphanum_key, reverse = reverse)
 
 def msg(level, *args):
     if verb >= level:
@@ -344,6 +351,7 @@ def gen_page(content = "&nbsp", content_class="flexcontent", path="", root="Home
                           "path_nav": html_path(root, path),
                           "path": path,
                           "run_subdir": run_subdir,
+                          "cryo_subdir": cryo_subdir,
                           "live_subdir": live_subdir,
                           "run_chunk": run_chunk,
                           "ref_run_chunk": ref_run_chunk_tag,
@@ -466,8 +474,24 @@ def get_dir_list(path):
         d.append(os.path.basename(p))
 
     if(len(d) == 0):
-        msg(1, "No dir found!")
-    d = natural_sort(d)
+        msg(1, "No dir found at path '%s'!" % path)
+
+    #In order to have first most recent runs and chunks on top of the
+    #list, we move directories named as numbers first ordered by
+    #decreasing order, then we put the alphanumeric ones
+    #in alphabetical oders.
+    d_num = []
+    d_alphanum = []
+    for x in d:
+        if re.match(r"^\d+$", x):
+            d_num.append(x)
+        else:
+            d_alphanum.append(x)
+
+    d = natural_sort(d_num, reverse=True) + natural_sort(d_alphanum, reverse=False)
+
+    d.sort(key = lambda x: dir_priorities[x] if x in dir_priorities else 0, reverse = True)
+    
     for x in d:
         yield x
 
@@ -571,7 +595,11 @@ def gen_navigation_(plot_path, compare_on, ref_run_chunk):
         if is_plot_dir(os.path.join(plot_dir, new_path)):
             return gen_plot_page(plot_path, compare_on, ref_run_chunk)
         else:
+            if r == "Now":
+                r = "&nbsp;" * 3 + r + "&nbsp;"*2
             dir_list += build_page("templates/run.thtml", {"link": "?page=nav&path=%s" % urlparse.quote(new_path), "run_num": r})
+
+
 
     return gen_page(content=dir_list, content_class="runlist", path=plot_path, root = "Runs")
 
@@ -604,21 +632,32 @@ def resubs(string, substitutions):
 def html_path(root, path):
     '''Encode plot navigation PATH in html and includes links.'''
     dirs = path.split('/')
+    nskip = 0
+    if (root == "Runs") and (os.path.commonprefix((path, cryo_subdir)) == cryo_subdir):
+        root = "Cryo"
+
     if root == "Home":
         result = '<a href="/">%s</a>' % html.escape(root)
     elif root == "Runs":
         result = '<a href="?page=nav&path=%s">%s</a>' % (urlparse.quote(run_subdir), html.escape(root))
+        nskip = len([x for x in os.path.split(run_subdir) if x])
+    elif root == "Cryo":
+        result = '<a href="?page=nav&path=%s">%s</a>' % (urlparse.quote(cryo_subdir), html.escape(root))
+        nskip = len([x for x in os.path.split(cryo_subdir) if x])
     else:
         result = html.escape(root)
 
     path = ""
     sep = "&nbsp;&gt; "
+    skipped = 0
     for d in dirs:
         if len(d.strip())==0:
             continue
         path = os.path.join(path, d)
-        result += sep + '<a href="?page=nav&path=%s">%s</a>' % (urlparse.quote(path), html.escape(d))
-
+        if skipped < nskip:
+            skipped += 1
+        else:
+            result += sep + '<a href="?page=nav&path=%s">%s</a>' % (urlparse.quote(path), html.escape(d))
 
     return result
 
@@ -732,7 +771,7 @@ if __name__ == "__main__":
     parser.add_argument('--host', '-H', default='192.168.3.152', help='Specifies host.')
     parser.add_argument('--port', '-p', default=8787, type=int, help='Specifies port to listen to.')
     parser.add_argument('--verbose', '-v', action='count', default=1, help='Increase verbosity')
-    parser.add_argument('--quiet', '-q', action='count', default=1, help='Quiet mode. Reduces message at the minium.')
+    parser.add_argument('--quiet', '-q', action='count', default=0, help='Quiet mode. Reduces message at the minium.')
     opt = parser.parse_args()
     verb = opt.verbose
 

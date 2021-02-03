@@ -14,7 +14,7 @@
   </div>
   <div class="topnav">
     <a href="?page=home">Home</a>
-<!--    <a href="/nav?path=$live_subdir">Live</a> -->
+    <a href="?page=nav&path=$cryo_subdir">Cryo</a>
     <a href="?page=nav&path=$run_subdir">Runs</a>
     <a href="?page=run&run_chunk=-1">Latest</a>
     <div class="top_nav_ruler"></div>
