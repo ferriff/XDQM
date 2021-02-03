@@ -483,7 +483,7 @@ def get_dir_list(path):
     d_num = []
     d_alphanum = []
     for x in d:
-        if re.match(r"^\d+$", x):
+        if re.match(r"^[\d-]+$", x):
             d_num.append(x)
         else:
             d_alphanum.append(x)
