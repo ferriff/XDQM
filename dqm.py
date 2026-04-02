@@ -12,7 +12,9 @@ install_aliases()
 
 #from wsgiref.simple_server import make_server
 from gevent.pywsgi import WSGIServer
-from cgi import parse_qs, escape
+#from cgi import parse_qs, escape
+#from urllib.parse import parse_qs
+#from html import escape
 from email.utils import formatdate
 
 import string
@@ -567,7 +569,7 @@ def last_run_chunk():
         return None
 
     try:
-        chunk = max(chunk_dir_filter(glob.iglob(os.path.join(plot_dir, run_subdir, run))))
+        chunk = max(chunk_dir_filter(glob.iglob("*", root_dir=os.path.join(plot_dir, run_subdir, run))))
     except ValueError: #expected if the list is empty
         return [int(run.lstrip('0')), None]
 
