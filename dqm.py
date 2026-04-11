@@ -561,7 +561,7 @@ def first_chunk_of_run(run):
         chunk = min(chunk_dir_filter(glob.iglob(os.path.join(plot_dir, run_subdir, run_num_format % run))))
     except ValueError: #expected if the list is empty
         return None        
-            
+
 def last_run_chunk():
     try:
         run = max(run_dir_filter(map(os.path.basename, glob.iglob(os.path.join(plot_dir, run_subdir, '*')))))
@@ -574,7 +574,8 @@ def last_run_chunk():
         return [int(run.lstrip('0')), None]
 
     #FIXME: the code below assumes a specific format for run and chunk dirs
-    return [int(run.lstrip('0')), int(chunk.lstrip('0'))]
+    sc = chunk.strip('0')
+    return [int(run.lstrip('0')), 0 if sc == '' else int(sc)]
                                      
     
     
